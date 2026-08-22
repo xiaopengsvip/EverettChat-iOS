@@ -4,6 +4,8 @@ import Foundation
 @MainActor
 final class ChatApiClient: ObservableObject {
     @Published var isStreaming = false
+    @Published var streamText = ""
+    @Published var reasoningText = ""
 
     private var task: URLSessionDataTask?
     private var cancelFlag = false
@@ -95,10 +97,12 @@ final class ChatApiClient: ObservableObject {
     private func flush(_ reasoning: inout String, _ content: inout String,
                        _ onDelta: @escaping (String, Bool) -> Void) {
         if !reasoning.isEmpty {
+            reasoningText += reasoning
             onDelta(reasoning, true)
             reasoning = ""
         }
         if !content.isEmpty {
+            streamText += content
             onDelta(content, false)
             content = ""
         }
