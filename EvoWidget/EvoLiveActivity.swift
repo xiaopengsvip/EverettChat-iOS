@@ -126,7 +126,7 @@ struct EvoLiveActivity: Widget {
         ActivityConfiguration(for: EvoActivityAttributes.self) { context in
             // 灵动岛
             EvoLiveActivityView(context: context)
-                .activityBackgroundTint(dark: Color(hex: 0x111114).opacity(0.9))
+                .activityBackgroundTint(Color(hex: 0x111114).opacity(0.9))
                 .activitySystemActionForegroundColor(.white)
         } dynamicIsland: { context in
             DynamicIsland {
