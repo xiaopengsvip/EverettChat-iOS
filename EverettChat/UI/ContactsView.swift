@@ -7,24 +7,11 @@ struct ContactsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶栏（标题居中）
-            ZStack {
-                Text("通讯录")
-                    .font(.title3.bold())
-                    .foregroundColor(Theme.textPrimary)
-                HStack {
-                    Spacer()
-                    Button { appState.showMyQr = true } label: {
-                        Image(systemName: "qrcode").font(.body).foregroundColor(Theme.textSecondary)
-                    }
+            // 顶栏（统一 PageTitleBar）
+            PageTitleBar(title: "通讯录") {
+                TitleBarButton(icon: "qrcode") {
+                    appState.showMyQr = true
                 }
-            }
-            .padding(.horizontal, Spacing.lg)
-            .padding(.vertical, Spacing.md)
-            // 顶栏与内容区分：深一层的背景色 + 可见分割线
-            .background(Theme.bgAlt)
-            .overlay(alignment: .bottom) {
-                Divider().overlay(Theme.outline)
             }
 
             // 搜索（原生液态玻璃）

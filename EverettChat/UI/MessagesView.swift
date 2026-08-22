@@ -8,30 +8,11 @@ struct MessagesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶栏（标题居中）
-            ZStack {
-                Text("消息")
-                    .font(.title3.bold())
-                    .foregroundColor(Theme.textPrimary)
-                HStack {
-                    Spacer()
-                    Button {
-                        showAddSheet = true
-                    } label: {
-                        Image(systemName: "plus")
-                            .font(.system(size: 18, weight: .light))
-                            .foregroundColor(Theme.textPrimary)
-                            .frame(width: 36, height: 36)
-                            .background(RoundedRectangle(cornerRadius: 10).fill(Theme.surfaceHigh))
-                    }
+            // 顶栏（统一 PageTitleBar）
+            PageTitleBar(title: "消息") {
+                TitleBarButton(icon: "plus") {
+                    showAddSheet = true
                 }
-            }
-            .padding(.horizontal, Spacing.lg)
-            .padding(.vertical, Spacing.md)
-            // 顶栏与内容区分：深一层的背景色 + 可见分割线
-            .background(Theme.bgAlt)
-            .overlay(alignment: .bottom) {
-                Divider().overlay(Theme.outline)
             }
 
             ScrollView {
