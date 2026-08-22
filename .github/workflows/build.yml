@@ -27,19 +27,27 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
-      - name: Build (simulator, no signing)
+      - name: Build (device, no signing)
         run: |
           xcodebuild -project EverettChat.xcodeproj \
             -scheme EverettChat \
             -configuration Debug \
-            -destination 'generic/platform=iOS Simulator' \
+            -destination 'generic/platform=iOS' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
             build 2>&1 | tail -40
 
-      - name: Upload simulator build
+      - name: Package IPA
+        run: |
+          cd build/Build/Products/Debug-iphoneos
+          mkdir -p Payload
+          cp -R EverettChat.app Payload/
+          zip -r EverettChat.ipa Payload
+          ls -lh EverettChat.ipa
+
+      - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
-          name: EverettChat-simulator
-          path: build/Build/Products/Debug-iphonesimulator/EverettChat.app
+          name: EverettChat-device-ipa
+          path: build/Build/Products/Debug-iphoneos/EverettChat.ipa
           if-no-files-found: warn
