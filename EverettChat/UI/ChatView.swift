@@ -178,78 +178,21 @@ struct ChatView: View {
                     .padding(.bottom, 4)
                 }
 
-                HStack(spacing: Spacing.sm) {
-                    // + 号按钮 → 功能模块面板（相册/文件/拍摄/语音电话/视频电话/个人名片）
-                    Button {
-                        showPlusPanel = true
-                    } label: {
-                        Image(systemName: "plus.circle.fill")
-                            .font(.system(size: 22))
-                            .foregroundColor(Theme.textSecondary)
-                            .frame(width: 40, height: 40)
-                    }
-
-                    TextField(isAI ? "向 AI 提问..." : "加密消息给 \(appState.chatPeerName)...", text: $input)
-                        .textFieldStyle(.plain)
-                        .font(.body)
-                        .padding(.horizontal, 14)
-                        .frame(height: 40)
-                        .background(RoundedRectangle(cornerRadius: 20).fill(Theme.surfaceHigh))
-                        .submitLabel(.send)
-                        .onSubmit { send() }
-
-                    // 右侧：无文字时按住录音，有文字时发送
-                    if input.isEmpty {
-                        // 按住录音，松开发送，上滑取消
-                        ZStack {
-                            if isRecording {
-                                Text(isVoiceSlidingUp ? "⬆️ 松开取消" : String(format: "%.0f\"", recordingSeconds))
-                                    .font(.caption)
-                                    .foregroundColor(isVoiceSlidingUp ? Theme.error : Theme.textSecondary)
-                                    .offset(y: -36)
-                                    .transition(.scale.combined(with: .opacity))
-                            }
-                            Image(systemName: isRecording ? "waveform" : "mic.fill")
-                                .font(.system(size: 18))
-                                .foregroundColor(isRecording ? (isVoiceSlidingUp ? Theme.error : Theme.primary) : Theme.textSecondary)
-                                .frame(width: 44, height: 44)
-                                .background(
-                                    Circle().fill(isRecording ? (isVoiceSlidingUp ? Theme.error.opacity(0.15) : Theme.primary.opacity(0.15)) : .clear)
-                                )
-                                .gesture(
-                                    DragGesture(minimumDistance: 0)
-                                        .onChanged { value in
-                                            if !isRecording {
-                                                startRecording()
-                                            }
-                                            isVoiceSlidingUp = value.translation.height < -60
-                                            voiceDragOffset = value.translation.height
-                                        }
-                                        .onEnded { value in
-                                            if isVoiceSlidingUp {
-                                                // 上滑取消
-                                                cancelRecording()
-                                            } else {
-                                                // 松开发送
-                                                stopRecordingAndSend()
-                                            }
-                                            isVoiceSlidingUp = false
-                                            voiceDragOffset = 0
-                                        }
-                                )
-                        }
-                    } else {
-                        Button {
-                            send()
-                        } label: {
-                            Image(systemName: "paperplane.fill")
-                                .font(.system(size: 18))
-                                .foregroundColor(.white)
-                                .frame(width: 44, height: 44)
-                                .background(Circle().fill(Theme.primary))
-                        }
-                    }
-                }
+                // 输入区（独立组件，含 +号/按住录音/发送）
+                ChatInputBar(
+                    input: $input,
+                    isAI: isAI,
+                    peerName: appState.chatPeerName,
+                    isRecording: isRecording,
+                    isVoiceSlidingUp: isVoiceSlidingUp,
+                    recordingSeconds: recordingSeconds,
+                    onPlus: { showPlusPanel = true },
+                    onSend: { send() },
+                    onStartRecord: { startRecording() },
+                    onEndRecord: { stopRecordingAndSend() },
+                    onCancelRecord: { cancelRecording() },
+                    onSlideUpChange: { up in isVoiceSlidingUp = up }
+                )
                 .padding(.horizontal, Spacing.md)
                 .padding(.vertical, Spacing.sm)
             }
@@ -881,7 +824,6 @@ struct VoiceHintBubble: View {
         if !text.isEmpty { return text }
         return isRecording ? "正在录音..." : "按住说话"
     }
-
     var body: some View {
         Text(display)
             .font(.caption)
@@ -889,5 +831,99 @@ struct VoiceHintBubble: View {
             .padding(.horizontal, 16)
             .padding(.vertical, 8)
             .background(Capsule().fill(Color.black.opacity(0.7)))
+    }
+}
+
+/// 输入区组件：+号功能 / 文本框 / 按住录音(上滑取消) / 发送
+struct ChatInputBar: View {
+    @Binding var input: String
+    let isAI: Bool
+    let peerName: String
+    let isRecording: Bool
+    let isVoiceSlidingUp: Bool
+    let recordingSeconds: Double
+    let onPlus: () -> Void
+    let onSend: () -> Void
+    let onStartRecord: () -> Void
+    let onEndRecord: () -> Void
+    let onCancelRecord: () -> Void
+    let onSlideUpChange: (Bool) -> Void
+
+    var body: some View {
+        HStack(spacing: Spacing.sm) {
+            plusButton
+            textField
+            if input.isEmpty {
+                voiceButton
+            } else {
+                sendButton
+            }
+        }
+    }
+
+    private var plusButton: some View {
+        Button(action: onPlus) {
+            Image(systemName: "plus.circle.fill")
+                .font(.system(size: 22))
+                .foregroundColor(Theme.textSecondary)
+                .frame(width: 40, height: 40)
+        }
+    }
+
+    private var textField: some View {
+        TextField(isAI ? "向 AI 提问..." : "加密消息给 \(peerName)...", text: $input)
+            .textFieldStyle(.plain)
+            .font(.body)
+            .padding(.horizontal, 14)
+            .frame(height: 40)
+            .background(RoundedRectangle(cornerRadius: 20).fill(Theme.surfaceHigh))
+            .submitLabel(.send)
+            .onSubmit(onSend)
+    }
+
+    private var voiceButton: some View {
+        ZStack {
+            if isRecording {
+                Text(isVoiceSlidingUp ? "⬆️ 松开取消" : String(format: "%.0f\"", recordingSeconds))
+                    .font(.caption)
+                    .foregroundColor(isVoiceSlidingUp ? Theme.error : Theme.textSecondary)
+                    .offset(y: -36)
+                    .transition(.scale.combined(with: .opacity))
+            }
+            Image(systemName: isRecording ? "waveform" : "mic.fill")
+                .font(.system(size: 18))
+                .foregroundColor(isRecording ? (isVoiceSlidingUp ? Theme.error : Theme.primary) : Theme.textSecondary)
+                .frame(width: 44, height: 44)
+                .background(
+                    Circle().fill(isRecording ? (isVoiceSlidingUp ? Theme.error.opacity(0.15) : Theme.primary.opacity(0.15)) : .clear)
+                )
+                .gesture(
+                    DragGesture(minimumDistance: 0)
+                        .onChanged { value in
+                            if !isRecording {
+                                onStartRecord()
+                            }
+                            onSlideUpChange(value.translation.height < -60)
+                        }
+                        .onEnded { value in
+                            if isVoiceSlidingUp {
+                                onCancelRecord()
+                            } else {
+                                onEndRecord()
+                            }
+                            onSlideUpChange(false)
+                        }
+                )
+        }
+    }
+
+    private var sendButton: some View {
+        Button(action: onSend) {
+            Image(systemName: "paperplane.fill")
+                .font(.system(size: 18))
+                .foregroundColor(.white)
+                .frame(width: 44, height: 44)
+                .background(Circle().fill(Theme.primary))
+        }
     }
 }
