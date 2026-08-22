@@ -865,7 +865,7 @@ struct ChatInputBar: View {
             }
 
             if voiceMode {
-                // 按住说话（微信样式）
+                // 按住说话（微信样式：长按激活录音 + 拖动上滑取消/转文字）
                 Text(isRecording ? (isVoiceSlidingUp ? "松开 取消" : "松开 发送") : "按住 说话")
                     .font(.body)
                     .foregroundColor(isRecording ? (isVoiceSlidingUp ? Theme.error : Theme.primary) : Theme.textTertiary)
@@ -876,21 +876,35 @@ struct ChatInputBar: View {
                             .fill(isRecording ? (isVoiceSlidingUp ? Theme.error.opacity(0.15) : Theme.primary.opacity(0.15)) : Theme.surfaceHigh)
                     )
                     .gesture(
-                        DragGesture(minimumDistance: 0)
+                        LongPressGesture(minimumDuration: 0.15)
+                            .sequenced(before: DragGesture(minimumDistance: 0))
                             .onChanged { value in
-                                if !isRecording { onStartRecord() }
-                                onSlideUpChange(value.translation.height < -60)
-                                onDragChange(value.translation.height)
+                                switch value {
+                                case .first(true):
+                                    // 长按激活 → 开始录音
+                                    onStartRecord()
+                                case .second(true, let drag?):
+                                    onSlideUpChange(drag.translation.height < -60)
+                                    onDragChange(drag.translation.height)
+                                default:
+                                    break
+                                }
                             }
                             .onEnded { value in
                                 onSlideUpChange(false)
                                 onDragChange(0)
-                                if value.translation.height < -140 {
-                                    // 转文字（即将上线）
-                                    onCancelRecord()
-                                } else if value.translation.height < -60 {
-                                    onCancelRecord()
-                                } else {
+                                switch value {
+                                case .second(true, let drag?):
+                                    if drag.translation.height < -140 {
+                                        // 转文字（即将上线）
+                                        onCancelRecord()
+                                    } else if drag.translation.height < -60 {
+                                        onCancelRecord()
+                                    } else {
+                                        onEndRecord()
+                                    }
+                                default:
+                                    // 长按后原地松开 → 发送
                                     onEndRecord()
                                 }
                             }
@@ -936,7 +950,7 @@ struct ChatInputBar: View {
     }
 }
 
-/// 附件面板（微信风格 2行网格：照片/拍摄/语音通话/位置/红包/礼物/转账/语音输入）
+/// 附件面板（微信风格：2行×4列每页8个，多页左右滑动）
 struct AttachmentPanel: View {
     let onAlbum: () -> Void
     let onCamera: () -> Void
@@ -949,22 +963,52 @@ struct AttachmentPanel: View {
     let onVoiceInput: () -> Void
     let onNamecard: () -> Void
 
-    private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+    @State private var page = 0
+
+    private let columns = [GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8), GridItem(.flexible(), spacing: 8)]
+
+    // 第 1 页：8 个常用
+    private var page1: [AttachmentItemData] {
+        [
+            AttachmentItemData(icon: "photo.on.rectangle.angled", color: Color(hex: 0x34C759), label: "照片", action: onAlbum),
+            AttachmentItemData(icon: "camera.fill", color: Color(hex: 0x007AFF), label: "拍摄", action: onCamera),
+            AttachmentItemData(icon: "folder.fill", color: Color(hex: 0xFF9500), label: "文件", action: onFile),
+            AttachmentItemData(icon: "phone.fill", color: Color(hex: 0x34C759), label: "语音通话", action: onVoiceCall),
+            AttachmentItemData(icon: "location.fill", color: Color(hex: 0xFF3B30), label: "位置", action: onLocation),
+            AttachmentItemData(icon: "gift.fill", color: Color(hex: 0xFF3B30), label: "红包", action: onRedPacket),
+            AttachmentItemData(icon: "gift.circle.fill", color: Color(hex: 0xFF9500), label: "礼物", action: onGift),
+            AttachmentItemData(icon: "arrow.left.arrow.right", color: Color(hex: 0x007AFF), label: "转账", action: onTransfer),
+        ]
+    }
+
+    // 第 2 页：其余
+    private var page2: [AttachmentItemData] {
+        [
+            AttachmentItemData(icon: "mic.circle.fill", color: Color(hex: 0xAF52DE), label: "语音输入", action: onVoiceInput),
+            AttachmentItemData(icon: "person.crop.square.fill", color: Color(hex: 0x007AFF), label: "名片", action: onNamecard),
+        ]
+    }
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 14) {
-            AttachmentItem(icon: "photo.on.rectangle.angled", color: Color(hex: 0x34C759), label: "照片", action: onAlbum)
-            AttachmentItem(icon: "camera.fill", color: Color(hex: 0x007AFF), label: "拍摄", action: onCamera)
-            AttachmentItem(icon: "folder.fill", color: Color(hex: 0xFF9500), label: "文件", action: onFile)
-            AttachmentItem(icon: "phone.fill", color: Color(hex: 0x34C759), label: "语音通话", action: onVoiceCall)
-            AttachmentItem(icon: "location.fill", color: Color(hex: 0xFF3B30), label: "位置", action: onLocation)
-            AttachmentItem(icon: "gift.fill", color: Color(hex: 0xFF3B30), label: "红包", action: onRedPacket)
-            AttachmentItem(icon: "gift.circle.fill", color: Color(hex: 0xFF9500), label: "礼物", action: onGift)
-            AttachmentItem(icon: "arrow.left.arrow.right", color: Color(hex: 0x007AFF), label: "转账", action: onTransfer)
-            AttachmentItem(icon: "mic.circle.fill", color: Color(hex: 0xAF52DE), label: "语音输入", action: onVoiceInput)
-            AttachmentItem(icon: "person.crop.square.fill", color: Color(hex: 0x007AFF), label: "名片", action: onNamecard)
+        VStack(spacing: 8) {
+            TabView(selection: $page) {
+                gridPage(page1).tag(0)
+                gridPage(page2).tag(1)
+            }
+            .tabViewStyle(.page(indexDisplayMode: page2.isEmpty ? .never : .always))
+            .frame(height: 150)
+
+            // 页码指示点
+            if !page2.isEmpty {
+                HStack(spacing: 6) {
+                    ForEach(0..<2, id: \.self) { i in
+                        Circle()
+                            .fill(i == page ? Theme.primary : Theme.surfaceAlt)
+                            .frame(width: 6, height: 6)
+                    }
+                }
+            }
         }
-        .padding(.horizontal, Spacing.lg)
         .padding(.vertical, Spacing.lg)
         .frame(maxWidth: .infinity)
         .background(Theme.surface)
@@ -972,6 +1016,24 @@ struct AttachmentPanel: View {
         .padding(.horizontal, Spacing.sm)
         .padding(.bottom, Spacing.sm)
     }
+
+    private func gridPage(_ items: [AttachmentItemData]) -> some View {
+        LazyVGrid(columns: columns, spacing: 14) {
+            ForEach(items) { item in
+                AttachmentItem(icon: item.icon, color: item.color, label: item.label, action: item.action)
+            }
+        }
+        .padding(.horizontal, Spacing.lg)
+    }
+}
+
+/// 附件项数据
+struct AttachmentItemData: Identifiable {
+    let id = UUID()
+    let icon: String
+    let color: Color
+    let label: String
+    let action: () -> Void
 }
 
 /// 附件网格单项
@@ -1104,20 +1166,23 @@ struct EmojiPanel: View {
     ]
 
     var body: some View {
-        LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: 8) {
-            ForEach(emojis, id: \.self) { emoji in
-                Button {
-                    onSelect(emoji)
-                } label: {
-                    Text(emoji)
-                        .font(.system(size: 28))
-                        .frame(width: 44, height: 44)
+        ScrollView {
+            LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: 8) {
+                ForEach(emojis, id: \.self) { emoji in
+                    Button {
+                        onSelect(emoji)
+                    } label: {
+                        Text(emoji)
+                            .font(.system(size: 28))
+                            .frame(width: 44, height: 44)
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
             }
+            .padding(Spacing.md)
         }
-        .padding(Spacing.md)
-        .frame(maxWidth: .infinity, maxHeight: 220)
+        .frame(maxWidth: .infinity)
+        .frame(height: 200)
         .background(Theme.surface)
         .clipShape(RoundedRectangle(cornerRadius: Radius.large, style: .continuous))
         .padding(.horizontal, Spacing.sm)
