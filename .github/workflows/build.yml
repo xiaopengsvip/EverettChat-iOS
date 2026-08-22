@@ -23,7 +23,8 @@ jobs:
         run: |
           curl -L -o /tmp/xcodegen.zip https://github.com/yonaskolb/XcodeGen/releases/download/2.42.0/xcodegen.zip
           unzip -o /tmp/xcodegen.zip -d /tmp/xcodegen
-          echo "/tmp/xcodegen" >> $GITHUB_PATH
+          echo "/tmp/xcodegen/xcodegen/bin" >> $GITHUB_PATH
+          which xcodegen
           xcodegen --version
 
       - name: Generate Xcode project
