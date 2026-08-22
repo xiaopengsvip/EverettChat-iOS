@@ -262,6 +262,9 @@ struct ChatView: View {
 
     private func sendAI(_ text: String) {
         isStreaming = true
+        // 灵动岛：AI 任务开始
+        EvoActivityManager.shared.start(sessionId: "ai", peerName: "EVO AI")
+        EvoActivityManager.shared.update(status: "思考中", progress: 0.1, fileName: text.count > 20 ? String(text.prefix(20)) + "…" : text)
         let history = messages.dropLast().map { (role: $0.role == "user" ? "user" : "assistant", content: $0.text) }
         Task {
             let result = await apiClient.sendMessage(
@@ -287,6 +290,9 @@ struct ChatView: View {
             isStreaming = false
             if result == nil || result?.isEmpty == true {
                 messages.append(ChatMessage(role: "ai", text: "（无回复）", isError: true))
+                EvoActivityManager.shared.end(status: "失败", progress: 0)
+            } else {
+                EvoActivityManager.shared.end(status: "完成", progress: 1)
             }
         }
     }
@@ -294,6 +300,8 @@ struct ChatView: View {
     /// 发送图片给 AI（vision 模型）
     private func sendAI(text: String, imageBase64: String) {
         isStreaming = true
+        EvoActivityManager.shared.start(sessionId: "ai", peerName: "EVO AI")
+        EvoActivityManager.shared.update(status: "分析图片中", progress: 0.2)
         let history = messages.dropLast().map { (role: $0.role == "user" ? "user" : "assistant", content: $0.text) }
         Task {
             let result = await apiClient.sendImageMessage(
@@ -320,6 +328,9 @@ struct ChatView: View {
             isStreaming = false
             if result == nil || result?.isEmpty == true {
                 messages.append(ChatMessage(role: "ai", text: "（无回复）", isError: true))
+                EvoActivityManager.shared.end(status: "失败", progress: 0)
+            } else {
+                EvoActivityManager.shared.end(status: "完成", progress: 1)
             }
         }
     }
