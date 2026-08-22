@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: macos-26
+    runs-on: macos-27
     timeout-minutes: 60
 
     steps:
@@ -31,12 +31,10 @@ jobs:
           sudo xcode-select -s "$XCODE_PATH"
           xcodebuild -version
 
-      - name: Install XcodeGen (pinned 2.42.0 for Xcode 15 compat)
+      - name: Install XcodeGen (latest for Xcode 27)
         run: |
-          curl -L -o /tmp/xcodegen.zip https://github.com/yonaskolb/XcodeGen/releases/download/2.42.0/xcodegen.zip
-          unzip -o /tmp/xcodegen.zip -d /tmp/xcodegen
-          echo "/tmp/xcodegen/xcodegen/bin" >> $GITHUB_PATH
-          /tmp/xcodegen/xcodegen/bin/xcodegen --version
+          brew install xcodegen || brew upgrade xcodegen
+          xcodegen --version
 
       - name: Generate Xcode project
         run: xcodegen generate
