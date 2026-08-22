@@ -5,6 +5,10 @@ import UIKit
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
     @State private var showAutoDelete = false
+    @State private var showRecoveryKey = false
+    @State private var showRestore = false
+    @State private var restoreInput = ""
+    @State private var restoreResult: String? = nil
 
     var body: some View {
         VStack(spacing: 0) {
@@ -75,12 +79,47 @@ struct SettingsView: View {
                     }
                     SettingRow(icon: "📝", title: "反馈", subtitle: "问题与建议") {}
 
+                    sectionHeader("身份")
+                    SettingRow(icon: "🔑", title: "恢复密钥", subtitle: "保存此密钥，换机可恢复身份") {
+                        showRecoveryKey = true
+                    }
+                    SettingRow(icon: "♻️", title: "恢复身份", subtitle: "输入恢复密钥找回身份") {
+                        showRestore = true
+                    }
+
                     sectionHeader("关于")
                     SettingRow(icon: "📱", title: "版本", subtitle: "v1.0.0 · iOS") {}
                 }
             }
         }
         .background(Theme.bg)
+        // 恢复密钥展示
+        .alert("恢复密钥", isPresented: $showRecoveryKey) {
+            Button("复制") {
+                UIPasteboard.general.string = DeviceIdentity.shared.recoveryKey
+            }
+            Button("完成", role: .cancel) {}
+        } message: {
+            Text("""
+            请保存此密钥（换机或重装时输入可恢复身份）：
+
+            \(DeviceIdentity.shared.recoveryKey)
+            """)
+        }
+        // 恢复身份
+        .alert("恢复身份", isPresented: $showRestore) {
+            TextField("输入恢复密钥", text: $restoreInput)
+            Button("恢复") {
+                if DeviceIdentity.shared.restore(fromRecoveryKey: restoreInput) {
+                    restoreResult = "✅ 身份已恢复\n新 ID: \(DeviceIdentity.shared.shortId)\n请重新添加好友"
+                } else {
+                    restoreResult = "❌ 恢复密钥无效"
+                }
+            }
+            Button("取消", role: .cancel) {}
+        } message: {
+            Text(restoreResult ?? "输入之前保存的恢复密钥")
+        }
         // 自动删除天数选择
         .confirmationDialog("自动删除消息", isPresented: $showAutoDelete, titleVisibility: .visible) {
             Button("不自动删除") { setAutoDelete(0) }
