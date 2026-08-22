@@ -73,7 +73,7 @@ struct MainTabView: View {
     }
 }
 
-/// 悬浮底部导航（2026 Liquid Glass）
+/// 悬浮底部导航（原生 Liquid Glass）
 struct FloatingTabBar: View {
     @Binding var selected: MainTab
 
@@ -103,15 +103,25 @@ struct FloatingTabBar: View {
             }
         }
         .padding(.vertical, 10)
-        // 原生 Liquid Glass：系统毛玻璃（iOS 18+/27 自动适配珍珠白/深邃黑）
+        // 原生 Liquid Glass：iOS 26+ 用系统 glassEffect，低版本回退 ultraThinMaterial
         .background {
-            RoundedRectangle(cornerRadius: Radius.floating, style: .continuous)
-                .fill(.ultraThinMaterial)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radius.floating, style: .continuous)
-                        .stroke(Theme.outline, lineWidth: 1)
-                )
-                .shadow(color: .black.opacity(0.25), radius: 16, y: 4)
+            if #available(iOS 26.0, *) {
+                RoundedRectangle(cornerRadius: Radius.floating, style: .continuous)
+                    .glassEffect(.regular)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radius.floating, style: .continuous)
+                            .stroke(Theme.outline, lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.25), radius: 16, y: 4)
+            } else {
+                RoundedRectangle(cornerRadius: Radius.floating, style: .continuous)
+                    .fill(.ultraThinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radius.floating, style: .continuous)
+                            .stroke(Theme.outline, lineWidth: 1)
+                    )
+                    .shadow(color: .black.opacity(0.25), radius: 16, y: 4)
+            }
         }
         .padding(.horizontal, Spacing.lg)
         .padding(.bottom, Spacing.sm)

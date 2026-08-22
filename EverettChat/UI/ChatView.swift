@@ -57,8 +57,11 @@ struct ChatView: View {
             }
             .padding(.horizontal, Spacing.md)
             .padding(.vertical, Spacing.sm)
-
-            Divider().overlay(Theme.surfaceHigh)
+            // 顶栏与内容区分：原生材质背景 + 底部细分隔线
+            .background(.thinMaterial)
+            .overlay(alignment: .bottom) {
+                Divider().overlay(Theme.surfaceHigh)
+            }
 
             // 消息列表
             ScrollViewReader { proxy in

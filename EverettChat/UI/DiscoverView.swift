@@ -18,6 +18,11 @@ struct DiscoverView: View {
             }
             .padding(.horizontal, Spacing.lg)
             .padding(.vertical, Spacing.md)
+            // 顶栏与内容区分：原生材质背景 + 底部细分隔线
+            .background(.thinMaterial)
+            .overlay(alignment: .bottom) {
+                Divider().overlay(Theme.surfaceHigh)
+            }
 
             ScrollView {
                 VStack(spacing: 0) {
