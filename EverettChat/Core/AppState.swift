@@ -54,6 +54,8 @@ final class AppState: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     func start() {
+        // 启动自动应用 TTL 清理
+        applyAutoDelete()
         transport.onMessage = { [weak self] type, from, senderId, payload in
             guard let self else { return }
             switch type {
@@ -163,5 +165,18 @@ final class AppState: ObservableObject {
                 Conversation(id: senderId, name: name, type: "peer", lastText: lastText, lastTime: time)
             )
         }
+    }
+
+    /// 自动删除过期消息（TTL，依据 auto_delete_days）
+    func applyAutoDelete() {
+        let days = UserDefaults.standard.integer(forKey: "auto_delete_days")
+        guard days > 0 else { return }
+        let cutoff = Date().addingTimeInterval(-Double(days) * 86400)
+        aiMessages = aiMessages.filter { $0.createdAt >= cutoff }
+        peerMessages = peerMessages.filter { $0.createdAt >= cutoff }
+        conversations = conversations.filter { $0.lastTime >= cutoff }
+        MessageStore.saveAiMessages(aiMessages)
+        MessageStore.savePeerMessages(peerMessages)
+        MessageStore.saveConversations(conversations)
     }
 }

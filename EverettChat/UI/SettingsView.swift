@@ -4,6 +4,7 @@ import UIKit
 /// 我的页（设置）
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
+    @State private var showAutoDelete = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -67,6 +68,11 @@ struct SettingsView: View {
                     sectionHeader("通用")
                     SettingRow(icon: "🔋", title: "后台保活", subtitle: "前台保活 · 电池优化白名单") {}
                     SettingRow(icon: "🛰", title: "中继服务器", subtitle: "已配置 · \(PublicRelay.httpURL)") {}
+                    // 自动删除消息（TTL）
+                    let autoDays = UserDefaults.standard.integer(forKey: "auto_delete_days")
+                    SettingRow(icon: "⏱", title: "自动删除消息", subtitle: autoDays == 0 ? "不自动删除" : "保留 \(autoDays) 天") {
+                        showAutoDelete = true
+                    }
                     SettingRow(icon: "📝", title: "反馈", subtitle: "问题与建议") {}
 
                     sectionHeader("关于")
@@ -75,6 +81,20 @@ struct SettingsView: View {
             }
         }
         .background(Theme.bg)
+        // 自动删除天数选择
+        .confirmationDialog("自动删除消息", isPresented: $showAutoDelete, titleVisibility: .visible) {
+            Button("不自动删除") { setAutoDelete(0) }
+            Button("1 天") { setAutoDelete(1) }
+            Button("7 天") { setAutoDelete(7) }
+            Button("30 天") { setAutoDelete(30) }
+            Button("90 天") { setAutoDelete(90) }
+            Button("取消", role: .cancel) {}
+        }
+    }
+
+    private func setAutoDelete(_ days: Int) {
+        UserDefaults.standard.set(days, forKey: "auto_delete_days")
+        appState.applyAutoDelete()
     }
 
     private func sectionHeader(_ title: String) -> some View {
