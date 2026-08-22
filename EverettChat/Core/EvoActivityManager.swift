@@ -22,8 +22,7 @@ class EvoActivityManager {
         do {
             activity = try Activity.request(
                 attributes: attributes,
-                content: .init(state: state, staleDate: nil),
-                pushType: nil
+                content: .init(state: state, staleDate: nil)
             )
         } catch {
             activity = nil
@@ -55,7 +54,7 @@ class EvoActivityManager {
             isFinished: true
         )
         Task {
-            await activity.end(using: state, dismissalPolicy: .after(4.seconds))
+            await activity.end(using: state, dismissalPolicy: .after(Duration.seconds(4)))
             self.activity = nil
         }
     }
