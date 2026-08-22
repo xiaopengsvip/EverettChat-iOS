@@ -82,9 +82,7 @@ struct FloatingTabBar: View {
             ForEach(MainTab.allCases, id: \.self) { tab in
                 let isSelected = tab == selected
                 Button {
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
-                        selected = tab
-                    }
+                    appState.selectedTab = tab
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: tab.icon)
@@ -141,7 +139,10 @@ struct AddFriendSheet: View {
 
             Button {
                 dismiss()
-                appState.showQrScanner = true
+                // 延迟触发外层 sheet，避免与 dismiss 同时呈现冲突（"拉回去"问题）
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    appState.showQrScanner = true
+                }
             } label: {
                 Label("扫一扫", systemImage: "qrcode.viewfinder")
                     .font(.body)
@@ -154,7 +155,9 @@ struct AddFriendSheet: View {
 
             Button {
                 dismiss()
-                appState.showMyQr = true
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    appState.showMyQr = true
+                }
             } label: {
                 Label("我的二维码", systemImage: "qrcode")
                     .font(.body)
@@ -166,12 +169,6 @@ struct AddFriendSheet: View {
         }
         .background(Theme.surface)
         .presentationDetents([.height(200)])
-        .sheet(isPresented: $appState.showQrScanner) {
-            QrScannerView()
-        }
-        .sheet(isPresented: $appState.showMyQr) {
-            MyQrCodeView()
-        }
     }
 }
 

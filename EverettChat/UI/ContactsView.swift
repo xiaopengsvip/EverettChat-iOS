@@ -21,13 +21,13 @@ struct ContactsView: View {
             }
             .padding(.horizontal, Spacing.lg)
             .padding(.vertical, Spacing.md)
-            // 顶栏与内容区分：原生材质背景 + 底部细分隔线
-            .background(.thinMaterial)
+            // 顶栏与内容区分：深一层的背景色 + 可见分割线
+            .background(Theme.bgAlt)
             .overlay(alignment: .bottom) {
-                Divider().overlay(Theme.surfaceHigh)
+                Divider().overlay(Theme.outline)
             }
 
-            // 搜索
+            // 搜索（液态玻璃材质）
             HStack {
                 Image(systemName: "magnifyingglass").foregroundColor(Theme.textTertiary)
                 TextField("搜索联系人", text: $searchQuery)
@@ -37,8 +37,15 @@ struct ContactsView: View {
                 }
             }
             .padding(.horizontal, Spacing.md)
-            .padding(.vertical, 6)
-            .background(RoundedRectangle(cornerRadius: Radius.medium).fill(Theme.surfaceHigh))
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
+                    .fill(.thinMaterial)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
+                            .stroke(Theme.outline, lineWidth: 1)
+                    )
+            )
             .padding(.horizontal, Spacing.lg)
 
             // 我的名片

@@ -23,15 +23,15 @@ struct SettingsView: View {
             }
             .padding(.horizontal, Spacing.lg)
             .padding(.vertical, Spacing.md)
-            // 顶栏与内容区分：原生材质背景 + 底部细分隔线
-            .background(.thinMaterial)
+            // 顶栏与内容区分：深一层的背景色 + 可见分割线
+            .background(Theme.bgAlt)
             .overlay(alignment: .bottom) {
-                Divider().overlay(Theme.surfaceHigh)
+                Divider().overlay(Theme.outline)
             }
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // 用户卡片
+                    // 用户卡片（点击二维码可查看）
                     HStack(spacing: Spacing.md) {
                         Circle().fill(Theme.surfaceAlt).frame(width: 52, height: 52).overlay(Text("👤").font(.title3))
                         VStack(alignment: .leading) {
@@ -40,8 +40,19 @@ struct SettingsView: View {
                                 .font(.caption.monospaced()).foregroundColor(Theme.textTertiary)
                         }
                         Spacer()
+                        // 二维码按钮：点击查看我的二维码
+                        Button {
+                            appState.showMyQr = true
+                        } label: {
+                            Image(systemName: "qrcode")
+                                .font(.system(size: 20))
+                                .foregroundColor(Theme.primary)
+                                .frame(width: 40, height: 40)
+                                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.primaryDim))
+                        }
                     }
                     .padding(Spacing.lg)
+                    .contentShape(Rectangle())
 
                     sectionHeader("外观")
                     VStack(spacing: 0) {
@@ -67,33 +78,42 @@ struct SettingsView: View {
                     )
                     .padding(.horizontal, Spacing.lg)
 
-                    sectionHeader("设备")
-                    SettingRow(icon: "✏️", title: "设备名称", subtitle: appState.deviceName) {
-                        // 改名（简化为随机换名）
-                        _ = DeviceIdentity.shared.rerollName()
-                        appState.objectWillChange.send()
+                    sectionHeader("设备与通用")
+                    settingsCard {
+                        SettingRow(icon: "✏️", title: "设备名称", subtitle: appState.deviceName) {
+                            // 改名（简化为随机换名）
+                            _ = DeviceIdentity.shared.rerollName()
+                            appState.objectWillChange.send()
+                        }
+                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
+                        SettingRow(icon: "🔋", title: "后台保活", subtitle: "前台保活 · 电池优化白名单") {}
+                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
+                        SettingRow(icon: "🛰", title: "中继服务器", subtitle: "已配置 · \(PublicRelay.httpURL)") {}
+                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
+                        // 自动删除消息（TTL）
+                        let autoDays = UserDefaults.standard.integer(forKey: "auto_delete_days")
+                        SettingRow(icon: "⏱", title: "自动删除消息", subtitle: autoDays == 0 ? "不自动删除" : "保留 \(autoDays) 天") {
+                            showAutoDelete = true
+                        }
+                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
+                        SettingRow(icon: "📝", title: "反馈", subtitle: "问题与建议") {}
                     }
-
-                    sectionHeader("通用")
-                    SettingRow(icon: "🔋", title: "后台保活", subtitle: "前台保活 · 电池优化白名单") {}
-                    SettingRow(icon: "🛰", title: "中继服务器", subtitle: "已配置 · \(PublicRelay.httpURL)") {}
-                    // 自动删除消息（TTL）
-                    let autoDays = UserDefaults.standard.integer(forKey: "auto_delete_days")
-                    SettingRow(icon: "⏱", title: "自动删除消息", subtitle: autoDays == 0 ? "不自动删除" : "保留 \(autoDays) 天") {
-                        showAutoDelete = true
-                    }
-                    SettingRow(icon: "📝", title: "反馈", subtitle: "问题与建议") {}
 
                     sectionHeader("身份")
-                    SettingRow(icon: "🔑", title: "恢复密钥", subtitle: "保存此密钥，换机可恢复身份") {
-                        showRecoveryKey = true
-                    }
-                    SettingRow(icon: "♻️", title: "恢复身份", subtitle: "输入恢复密钥找回身份") {
-                        showRestore = true
+                    settingsCard {
+                        SettingRow(icon: "🔑", title: "恢复密钥", subtitle: "保存此密钥，换机可恢复身份") {
+                            showRecoveryKey = true
+                        }
+                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
+                        SettingRow(icon: "♻️", title: "恢复身份", subtitle: "输入恢复密钥找回身份") {
+                            showRestore = true
+                        }
                     }
 
                     sectionHeader("关于")
-                    SettingRow(icon: "📱", title: "版本", subtitle: "v1.0.0 · iOS") {}
+                    settingsCard {
+                        SettingRow(icon: "📱", title: "版本", subtitle: "v1.0.0 · iOS") {}
+                    }
                 }
             }
         }
@@ -148,6 +168,23 @@ struct SettingsView: View {
             .padding(.leading, Spacing.lg)
             .padding(.top, Spacing.md)
             .padding(.bottom, 4)
+    }
+
+    /// 统一设置卡片容器（圆角 + 边框）
+    @ViewBuilder
+    private func settingsCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
+        VStack(spacing: 0) {
+            content()
+        }
+        .background(
+            RoundedRectangle(cornerRadius: Radius.medium)
+                .fill(Theme.surface)
+                .overlay(
+                    RoundedRectangle(cornerRadius: Radius.medium)
+                        .stroke(Theme.outline, lineWidth: 1)
+                )
+        )
+        .padding(.horizontal, Spacing.lg)
     }
 
     private func applyThemeMode(_ mode: String) {

@@ -23,36 +23,43 @@ struct ChatView: View {
     @State private var scrollProxy: ScrollViewProxy?
     @State private var showInfoSheet = false
     @State private var pickerItem: PhotosPickerItem?
+    @State private var webURL: URL?
 
     private var isAI: Bool { appState.chatMode == "ai" }
     private let apiClient = ChatApiClient()
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶栏：返回 + 标题 + 副标题（模型名/ID）+ ℹ️
-            HStack(spacing: Spacing.sm) {
-                Button {
-                    appState.showChat = false
-                } label: {
-                    Image(systemName: "chevron.left")
-                        .font(.system(size: 18, weight: .medium))
-                        .foregroundColor(Theme.textPrimary)
-                }
-                VStack(alignment: .leading, spacing: 1) {
+            // 顶栏：返回 + 居中标题 + 副标题（模型名/ID）+ ℹ️
+            ZStack {
+                // 居中标题
+                VStack(alignment: .center, spacing: 1) {
                     Text(isAI ? "AI 助手" : appState.chatPeerName)
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
                     Text(isAI ? currentModelName : "ID: \(String(appState.chatPeerId.prefix(8)))")
                         .font(.caption2)
                         .foregroundColor(Theme.textTertiary)
                 }
-                Spacer()
-                Button {
-                    showInfoSheet = true
-                } label: {
-                    Image(systemName: "info.circle")
-                        .font(.system(size: 18))
-                        .foregroundColor(Theme.textSecondary)
+                // 左侧返回
+                HStack {
+                    Button {
+                        appState.showChat = false
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(Theme.textPrimary)
+                    }
+                    Spacer()
+                    // 右侧信息
+                    Button {
+                        showInfoSheet = true
+                    } label: {
+                        Image(systemName: "info.circle")
+                            .font(.system(size: 18))
+                            .foregroundColor(Theme.textSecondary)
+                    }
                 }
             }
             .padding(.horizontal, Spacing.md)
@@ -234,6 +241,14 @@ struct ChatView: View {
         .background(Theme.bg)
         .sheet(isPresented: $showModelSheet) { ModelPickerSheet(selected: $selectedModel) }
         .sheet(isPresented: $showInfoSheet) { ChatInfoSheet(isAI: isAI) }
+        // 消息内链接 → 应用内浏览器（不跳出 Safari）
+        .environment(\.openURL, OpenURLAction { url in
+            webURL = url
+            return .handled
+        })
+        .fullScreenCover(item: $webURL) { url in
+            SafariView(url: url)
+        }
         .onAppear {
             messages = isAI ? appState.aiMessages : peerMessagesForCurrent()
         }
@@ -532,7 +547,7 @@ struct MessageBubble: View {
                                 .cornerRadius(12)
                         }
                         if !msg.text.isEmpty {
-                            Text(msg.text)
+                            Text(linkified(msg.text))
                                 .font(.body)
                                 .foregroundColor(Theme.textPrimary)
                                 .textSelection(.enabled)
@@ -575,7 +590,7 @@ struct MessageBubble: View {
                             }
                         }
                         if !msg.text.isEmpty {
-                            Text(msg.text)
+                            Text(linkified(msg.text))
                                 .font(.body)
                                 .foregroundColor(isMine ? .white : Theme.textPrimary)
                                 .textSelection(.enabled)

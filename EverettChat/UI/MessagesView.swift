@@ -4,6 +4,7 @@ import SwiftUI
 struct MessagesView: View {
     @EnvironmentObject var appState: AppState
     @Binding var showAddSheet: Bool
+    @State private var searchQuery = ""
 
     var body: some View {
         VStack(spacing: 0) {
@@ -27,14 +28,36 @@ struct MessagesView: View {
             }
             .padding(.horizontal, Spacing.lg)
             .padding(.vertical, Spacing.md)
-            // 顶栏与内容区分：原生材质背景 + 底部细分隔线
-            .background(.thinMaterial)
+            // 顶栏与内容区分：深一层的背景色 + 可见分割线
+            .background(Theme.bgAlt)
             .overlay(alignment: .bottom) {
-                Divider().overlay(Theme.surfaceHigh)
+                Divider().overlay(Theme.outline)
             }
 
             ScrollView {
                 LazyVStack(spacing: 0) {
+                    // 消息搜索框（液态玻璃材质）
+                    HStack {
+                        Image(systemName: "magnifyingglass").foregroundColor(Theme.textTertiary)
+                        TextField("搜索消息", text: $searchQuery)
+                            .font(.body)
+                        if !searchQuery.isEmpty {
+                            Button { searchQuery = "" } label: { Image(systemName: "xmark.circle.fill").foregroundColor(Theme.textTertiary) }
+                        }
+                    }
+                    .padding(.horizontal, Spacing.md)
+                    .padding(.vertical, 10)
+                    .background(
+                        RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
+                            .fill(.thinMaterial)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
+                                    .stroke(Theme.outline, lineWidth: 1)
+                            )
+                    )
+                    .padding(.horizontal, Spacing.lg)
+                    .padding(.vertical, Spacing.sm)
+
                     // AI 助手固定置顶
                     ConversationRow(
                         icon: "🤖",
