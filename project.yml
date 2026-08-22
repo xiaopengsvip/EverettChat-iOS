@@ -2,13 +2,13 @@ name: EverettChat
 options:
   bundleIdPrefix: top.vios
   deploymentTarget:
-    iOS: "16.0"
+    iOS: "16.1"
   xcodeVersion: "15.0"
   createIntermediateGroups: true
 settings:
   base:
     SWIFT_VERSION: "5.9"
-    IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+    IPHONEOS_DEPLOYMENT_TARGET: "16.1"
     TARGETED_DEVICE_FAMILY: "1"
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: ""
@@ -57,7 +57,7 @@ targets:
         INFOPLIST_KEY_CFBundleDisplayName: EVO
         INFOPLIST_KEY_NSAppTransportSecurity: NSAllowsArbitraryLoads
         SWIFT_VERSION: "5.9"
-        IPHONEOS_DEPLOYMENT_TARGET: "16.0"
+        IPHONEOS_DEPLOYMENT_TARGET: "16.1"
         CODE_SIGN_STYLE: Automatic
         DEVELOPMENT_TEAM: ""
         ENABLE_USER_SCRIPT_SANDBOXING: NO
