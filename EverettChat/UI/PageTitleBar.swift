@@ -23,7 +23,7 @@ struct PageTitleBar: View {
             }
         }
         .padding(.horizontal, Spacing.lg)
-        .padding(.vertical, Spacing.md)
+        .padding(.vertical, Spacing.sm)
         // 顶栏与内容区分：深一层的背景色 + 可见分割线
         .background(Theme.bgAlt)
         .overlay(alignment: .bottom) {
@@ -40,10 +40,10 @@ struct TitleBarButton: View {
     var body: some View {
         Button(action: action) {
             Image(systemName: icon)
-                .font(.system(size: 18, weight: .light))
+                .font(.system(size: 17, weight: .light))
                 .foregroundColor(Theme.textPrimary)
-                .frame(width: 36, height: 36)
-                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.surfaceHigh))
+                .frame(width: 32, height: 32)
+                .background(RoundedRectangle(cornerRadius: 9).fill(Theme.surfaceHigh))
         }
     }
 }
