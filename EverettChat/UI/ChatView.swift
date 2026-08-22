@@ -160,7 +160,7 @@ struct ChatView: View {
                 if isAI {
                     let msg = ChatMessage(role: "user", text: card)
                     messages.append(msg)
-                    sendAI(text: card)
+                    sendAI(text: card, imageBase64: "")
                 } else {
                     let msg = ChatMessage(role: "user", text: card, senderId: appState.chatPeerId)
                     messages.append(msg)
