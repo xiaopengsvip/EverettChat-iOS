@@ -21,7 +21,10 @@ targets:
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: top.vios.chat
-        INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_CFBundleDisplayName: EVO
+        INFOPLIST_KEY_UILaunchScreen_Generation: NO
+        UILaunchStoryboardName: LaunchScreen
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
         INFOPLIST_KEY_NSAppTransportSecurity: NSAllowsArbitraryLoads
         GENERATE_INFOPLIST_FILE: YES

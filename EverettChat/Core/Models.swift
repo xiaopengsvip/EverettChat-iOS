@@ -75,7 +75,7 @@ enum ApiConfig {
     static let model = "deepseek-v4-flash"
     static let visionModel = "deepseek-v4-flash-vision-exp"
     static let hy3Model = "hy3"
-    static let systemPrompt = "你是 Everett 的 AI 助手，一个乐于助人、知识渊博的智能助手。请用简洁清晰的语言回答问题。"
+    static let systemPrompt = "你是 EVO 的 AI 助手，一个乐于助人、知识渊博的智能助手。请用简洁清晰的语言回答问题。"
 
     struct ModelInfo: Identifiable {
         let id: String
