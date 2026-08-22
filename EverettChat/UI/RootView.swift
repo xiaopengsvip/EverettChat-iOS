@@ -82,7 +82,7 @@ struct FloatingTabBar: View {
             ForEach(MainTab.allCases, id: \.self) { tab in
                 let isSelected = tab == selected
                 Button {
-                    appState.selectedTab = tab
+                    selected = tab
                 } label: {
                     VStack(spacing: 3) {
                         Image(systemName: tab.icon)

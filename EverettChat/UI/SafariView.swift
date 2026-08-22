@@ -26,8 +26,8 @@ func linkified(_ text: String) -> AttributedString {
     for match in regex.matches(in: text, range: nsRange).reversed() {
         guard let range = Range(match.range, in: text) else { continue }
         let urlText = String(text[range])
-        if let url = URL(string: urlText),
-           var sub = AttributedString(urlText) {
+        if let url = URL(string: urlText) {
+            var sub = AttributedString(urlText)
             sub.link = url
             sub.foregroundColor = .blue
             sub.underlineStyle = .single
