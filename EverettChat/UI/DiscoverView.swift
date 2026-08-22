@@ -4,6 +4,7 @@ import SwiftUI
 struct DiscoverView: View {
     @EnvironmentObject var appState: AppState
     @State private var featurePage: String? = nil
+    @State private var showGame = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -26,6 +27,7 @@ struct DiscoverView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
+                    FeatureRow(icon: "🎮", name: "游戏中心", desc: "game.vios.top · 原生打开") { showGame = true }
                     FeatureRow(icon: "📡", name: "局域网直连", desc: "同一 Wi-Fi · 配对码/扫描") { featurePage = "lan" }
                     FeatureRow(icon: "☁️", name: "云中继", desc: "公网跨网络 · 在线设备") { featurePage = "relay" }
                     FeatureRow(icon: "📶", name: "蓝牙直连", desc: "近距离 · 无需 Wi-Fi") { featurePage = "bt" }
@@ -36,6 +38,10 @@ struct DiscoverView: View {
             }
         }
         .background(Theme.bg)
+        // 游戏中心：应用内原生全屏打开（不跳出 Safari）
+        .fullScreenCover(isPresented: $showGame) {
+            SafariView(url: URL(string: "https://game.vios.top/")!)
+        }
         .sheet(item: Binding(
             get: { featurePage.map { FeaturePage(rawValue: $0)! } },
             set: { featurePage = $0?.rawValue }

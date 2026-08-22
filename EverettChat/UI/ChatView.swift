@@ -260,12 +260,7 @@ struct ChatView: View {
         // 语音提示浮层（录音提示/功能提示）
         .overlay(alignment: .top) {
             if showVoiceHint {
-                Text(voiceHintText.isEmpty ? (isRecording ? "正在录音..." : "按住说话") : voiceHintText)
-                    .font(.caption)
-                    .foregroundColor(.white)
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 8)
-                    .background(Capsule().fill(Color.black.opacity(0.7)))
+                VoiceHintBubble(text: voiceHintText, isRecording: isRecording)
                     .padding(.top, 8)
                     .transition(.opacity)
             }
@@ -574,7 +569,7 @@ struct ChatView: View {
         if isAI {
             let msg = ChatMessage(role: "user", text: text)
             messages.append(msg)
-            sendAI(text: text)
+            sendAI(text: text, imageBase64: "")
         } else {
             let msg = ChatMessage(role: "user", text: text, senderName: DeviceIdentity.shared.deviceName)
             messages.append(msg)
@@ -874,5 +869,25 @@ extension UIImage {
         return renderer.image { _ in
             self.draw(in: CGRect(origin: .zero, size: newSize))
         }
+    }
+}
+
+/// 语音提示气泡（录音/功能提示浮层）
+struct VoiceHintBubble: View {
+    let text: String
+    let isRecording: Bool
+
+    private var display: String {
+        if !text.isEmpty { return text }
+        return isRecording ? "正在录音..." : "按住说话"
+    }
+
+    var body: some View {
+        Text(display)
+            .font(.caption)
+            .foregroundColor(.white)
+            .padding(.horizontal, 16)
+            .padding(.vertical, 8)
+            .background(Capsule().fill(Color.black.opacity(0.7)))
     }
 }

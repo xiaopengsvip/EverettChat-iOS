@@ -10,6 +10,7 @@ struct SettingsView: View {
     @State private var restoreInput = ""
     @State private var restoreResult: String? = nil
     @State private var showMyQr = false
+    @State private var webURL: URL?
 
     var body: some View {
         VStack(spacing: 0) {
@@ -114,6 +115,16 @@ struct SettingsView: View {
                     sectionHeader("关于")
                     settingsCard {
                         SettingRow(icon: "📱", title: "版本", subtitle: "v1.0.0 · iOS") {}
+                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
+                        SettingRow(icon: "🌐", title: "官网", subtitle: "vios.top") { openWeb("https://vios.top/") }
+                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
+                        SettingRow(icon: "👨‍💻", title: "开发者信息", subtitle: "linktr.vios.top") { openWeb("https://linktr.vios.top/") }
+                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
+                        SettingRow(icon: "✉️", title: "邮箱", subtitle: "EVO@vios.top") {
+                            if let url = URL(string: "mailto:EVO@vios.top") {
+                                UIApplication.shared.open(url)
+                            }
+                        }
                     }
                 }
             }
@@ -122,6 +133,10 @@ struct SettingsView: View {
         // 我的二维码：当前页面直接全屏打开（不跳转）
         .fullScreenCover(isPresented: $showMyQr) {
             MyQrCodeView()
+        }
+        // 官网/开发者信息：应用内打开（不跳出 Safari）
+        .fullScreenCover(item: $webURL) { url in
+            SafariView(url: url)
         }
         // 恢复密钥展示
         .alert("恢复密钥", isPresented: $showRecoveryKey) {
@@ -164,6 +179,13 @@ struct SettingsView: View {
     private func setAutoDelete(_ days: Int) {
         UserDefaults.standard.set(days, forKey: "auto_delete_days")
         appState.applyAutoDelete()
+    }
+
+    /// 应用内打开网页（不跳出 Safari）
+    private func openWeb(_ urlString: String) {
+        if let url = URL(string: urlString) {
+            webURL = url
+        }
     }
 
     private func sectionHeader(_ title: String) -> some View {
