@@ -2,6 +2,7 @@ import SwiftUI
 import CoreImage
 import CoreImage.CIFilterBuiltins
 import AVFoundation
+import PhotosUI
 
 /// 我的二维码页（生成 + 保存相册）
 struct MyQrCodeView: View {
@@ -88,12 +89,13 @@ struct MyQrCodeView: View {
     }
 }
 
-/// 二维码扫描（相机）
+/// 二维码扫描（相机 + 相册）
 struct QrScannerView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var isScanning = true
     @State private var scanResult: String? = nil
+    @State private var pickerItem: PhotosPickerItem?
 
     var body: some View {
         ZStack {
@@ -118,12 +120,40 @@ struct QrScannerView: View {
                     .padding()
                 }
                 Spacer()
-                Text("扫描好友二维码")
-                    .font(.subheadline)
-                    .foregroundColor(.white)
-                    .padding(.vertical, 12)
-                    .frame(maxWidth: .infinity)
-                    .background(.black.opacity(0.5))
+                // 底部：相机扫码 + 相册扫码（异地：对方发来的二维码图片）
+                HStack(spacing: 20) {
+                    Text("扫描好友二维码")
+                        .font(.subheadline)
+                        .foregroundColor(.white)
+                    PhotosPicker(selection: $pickerItem, matching: .images) {
+                        HStack(spacing: 6) {
+                            Image(systemName: "photo.on.rectangle")
+                            Text("相册").font(.subheadline)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.black.opacity(0.5))
+                        .cornerRadius(20)
+                    }
+                    .onChange(of: pickerItem) { item in
+                        guard let item else { return }
+                        Task {
+                            if let data = try? await item.loadTransferable(type: Data.self),
+                               let img = UIImage(data: data),
+                               let ci = CIImage(image: img),
+                               let detector = CIDetector(ofType: CIDetectorTypeQRCode, context: nil, options: [CIDetectorAccuracy: CIDetectorAccuracyHigh]),
+                               let features = detector.features(in: ci) as? [CIQRCodeFeature],
+                               let msg = features.first?.messageString {
+                                scanResult = msg
+                            }
+                            pickerItem = nil
+                        }
+                    }
+                }
+                .padding(.vertical, 12)
+                .frame(maxWidth: .infinity)
+                .background(.black.opacity(0.5))
             }
         }
         .onChange(of: scanResult) { code in
