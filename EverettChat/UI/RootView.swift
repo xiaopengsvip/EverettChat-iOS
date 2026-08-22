@@ -35,6 +35,9 @@ struct RootView: View {
         .onChange(of: colorScheme) { _ in
             applyTheme()
         }
+        .onReceive(NotificationCenter.default.publisher(for: Notification.Name("EVOThemeChanged"))) { _ in
+            applyTheme()
+        }
     }
 
     private func applyTheme() {

@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 我的页（设置）
 struct SettingsView: View {
@@ -32,6 +33,30 @@ struct SettingsView: View {
                     }
                     .padding(Spacing.lg)
 
+                    sectionHeader("外观")
+                    VStack(spacing: 0) {
+                        ThemeModeRow(title: "跟随系统", mode: "system") {
+                            applyThemeMode("system")
+                        }
+                        Divider().overlay(Theme.surfaceHigh).padding(.leading, Spacing.lg)
+                        ThemeModeRow(title: "珍珠白 · Pearl White", mode: "light") {
+                            applyThemeMode("light")
+                        }
+                        Divider().overlay(Theme.surfaceHigh).padding(.leading, Spacing.lg)
+                        ThemeModeRow(title: "深邃黑 · Deep Black", mode: "dark") {
+                            applyThemeMode("dark")
+                        }
+                    }
+                    .background(
+                        RoundedRectangle(cornerRadius: Radius.medium)
+                            .fill(Theme.surface)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: Radius.medium)
+                                    .stroke(Theme.outline, lineWidth: 1)
+                            )
+                    )
+                    .padding(.horizontal, Spacing.lg)
+
                     sectionHeader("设备")
                     SettingRow(icon: "✏️", title: "设备名称", subtitle: appState.deviceName) {
                         // 改名（简化为随机换名）
@@ -59,6 +84,41 @@ struct SettingsView: View {
             .padding(.leading, Spacing.lg)
             .padding(.top, Spacing.md)
             .padding(.bottom, 4)
+    }
+
+    private func applyThemeMode(_ mode: String) {
+        UserDefaults.standard.set(mode, forKey: "theme_mode")
+        AppTheme.apply(mode, systemDark: UITraitCollection.current.userInterfaceStyle == .dark)
+        NotificationCenter.default.post(name: Notification.Name("EVOThemeChanged"), object: nil)
+    }
+}
+
+struct ThemeModeRow: View {
+    let title: String
+    let mode: String
+    let action: () -> Void
+
+    private var isSelected: Bool {
+        (UserDefaults.standard.string(forKey: "theme_mode") ?? "system") == mode
+    }
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: Spacing.md) {
+                Text(title)
+                    .font(.body)
+                    .foregroundColor(Theme.textPrimary)
+                Spacer()
+                if isSelected {
+                    Text("✓")
+                        .font(.body.weight(.semibold))
+                        .foregroundColor(Theme.primary)
+                }
+            }
+            .padding(Spacing.lg)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
     }
 }
 

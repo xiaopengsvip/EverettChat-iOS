@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 聊天页（AI / 对端，Document Style + 思考折叠 + 模型选择）
 struct ChatView: View {
@@ -66,6 +67,28 @@ struct ChatView: View {
                                 deviceName: appState.deviceName
                             )
                             .id(msg.id)
+                            .contextMenu {
+                                Button {
+                                    UIPasteboard.general.string = msg.text
+                                } label: {
+                                    Label("复制", systemImage: "doc.on.doc")
+                                }
+
+                                if isAI && msg.role == "ai" {
+                                    Button {
+                                        regenerateAIResponse(for: msg)
+                                    } label: {
+                                        Label("重新生成", systemImage: "arrow.clockwise")
+                                    }
+                                    .disabled(isStreaming)
+                                }
+
+                                Button(role: .destructive) {
+                                    deleteMessage(msg)
+                                } label: {
+                                    Label("删除", systemImage: "trash")
+                                }
+                            }
                         }
                         if isStreaming {
                             MessageBubble(
@@ -217,6 +240,20 @@ struct ChatView: View {
                 messages.append(ChatMessage(role: "ai", text: "（无回复）", isError: true))
             }
         }
+    }
+
+    private func deleteMessage(_ message: ChatMessage) {
+        messages.removeAll { $0.id == message.id }
+    }
+
+    private func regenerateAIResponse(for message: ChatMessage) {
+        guard isAI, !isStreaming,
+              let messageIndex = messages.firstIndex(where: { $0.id == message.id }),
+              let userMessage = messages[..<messageIndex].last(where: { $0.role == "user" })
+        else { return }
+
+        messages.removeSubrange(messageIndex..<messages.endIndex)
+        sendAI(userMessage.text)
     }
 }
 
