@@ -83,6 +83,24 @@ final class AppState: ObservableObject {
                     lastText: text.isEmpty ? "[图片]" : text,
                     time: message.createdAt
                 )
+            case "voice":
+                guard let voiceBase64 = payload["data"] as? String else { return }
+                let durationMs = payload["durationMs"] as? Double ?? 0
+                let message = ChatMessage(
+                    role: "peer",
+                    text: "",
+                    voiceBase64: voiceBase64,
+                    voiceDurationMs: durationMs,
+                    senderName: from,
+                    senderId: senderId
+                )
+                self.peerMessages.append(message)
+                self.updatePeerConversation(
+                    senderId: senderId,
+                    name: from,
+                    lastText: "[语音]",
+                    time: message.createdAt
+                )
             default:
                 break
             }

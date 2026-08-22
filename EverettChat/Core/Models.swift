@@ -7,18 +7,22 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     var role: String          // user | ai | peer
     var text: String
     var imageBase64: String = ""
+    var voiceBase64: String = ""
+    var voiceDurationMs: Double = 0
     var reasoning: String = ""
     var senderName: String = ""
     var senderId: String = ""
     var isError: Bool = false
     var createdAt: Date = Date()
 
-    init(id: String = UUID().uuidString, role: String, text: String, imageBase64: String = "", reasoning: String = "",
+    init(id: String = UUID().uuidString, role: String, text: String, imageBase64: String = "", voiceBase64: String = "", voiceDurationMs: Double = 0, reasoning: String = "",
          senderName: String = "", senderId: String = "", isError: Bool = false) {
         self.id = id
         self.role = role
         self.text = text
         self.imageBase64 = imageBase64
+        self.voiceBase64 = voiceBase64
+        self.voiceDurationMs = voiceDurationMs
         self.reasoning = reasoning
         self.senderName = senderName
         self.senderId = senderId
@@ -26,7 +30,7 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, role, text, imageBase64, reasoning, senderName, senderId, isError, createdAt
+        case id, role, text, imageBase64, voiceBase64, voiceDurationMs, reasoning, senderName, senderId, isError, createdAt
     }
 
     init(from decoder: Decoder) throws {

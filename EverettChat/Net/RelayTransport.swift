@@ -180,6 +180,16 @@ final class RelayTransport: NSObject, ObservableObject {
         )
     }
 
+    /// 发送语音消息（AAC m4a Base64），data 字段端到端加密
+    func sendVoice(base64: String, target: String, durationMs: Double, mime: String = "audio/m4a") {
+        guard let enc = CryptoEngine.encrypt(base64, passphrase: passphrase) else { return }
+        sendRaw(
+            type: "voice",
+            target: target,
+            payload: ["data": enc, "mime": mime, "durationMs": durationMs, "target": target]
+        )
+    }
+
     /// 查询在线用户
     func requestOnlineUsers() {
         sendRaw(type: "get-users")
