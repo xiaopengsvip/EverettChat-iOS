@@ -103,6 +103,11 @@ final class AppState: ObservableObject {
                     lastText: "[语音]",
                     time: message.createdAt
                 )
+            case "ack":
+                guard let ackId = payload["ackId"] as? String else { return }
+                if let idx = self.peerMessages.firstIndex(where: { $0.id == ackId }) {
+                    self.peerMessages[idx].status = "delivered"
+                }
             default:
                 break
             }

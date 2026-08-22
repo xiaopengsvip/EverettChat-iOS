@@ -75,7 +75,10 @@ struct ChatView: View {
                                 msg: msg,
                                 isMine: msg.role == "user",
                                 isAI: msg.role == "ai",
-                                deviceName: appState.deviceName
+                                deviceName: appState.deviceName,
+                                playingVoiceId: playingVoiceId,
+                                onPlayVoice: playVoice,
+                                onStopVoice: stopVoice
                             )
                             .id(msg.id)
                             .contextMenu {
@@ -104,7 +107,10 @@ struct ChatView: View {
                         if isStreaming {
                             MessageBubble(
                                 msg: ChatMessage(role: "ai", text: streamContent, reasoning: streamReasoning),
-                                isMine: false, isAI: true, deviceName: appState.deviceName
+                                isMine: false, isAI: true, deviceName: appState.deviceName,
+                                playingVoiceId: nil,
+                                onPlayVoice: { _ in },
+                                onStopVoice: {}
                             )
                             .id("streaming")
                         }
@@ -170,9 +176,9 @@ struct ChatView: View {
                                     messages.append(msg)
                                     sendAI(text: "", imageBase64: b64)
                                 } else {
-                                    appState.transport.sendImage(base64: b64, target: appState.chatPeerId)
                                     let msg = ChatMessage(role: "user", text: "", imageBase64: b64, senderName: DeviceIdentity.shared.deviceName)
                                     messages.append(msg)
+                                    appState.transport.sendImage(base64: b64, target: appState.chatPeerId, messageId: msg.id)
                                 }
                             }
                             pickerItem = nil
@@ -226,14 +232,32 @@ struct ChatView: View {
         .sheet(isPresented: $showModelSheet) { ModelPickerSheet(selected: $selectedModel) }
         .sheet(isPresented: $showInfoSheet) { ChatInfoSheet(isAI: isAI) }
         .onAppear {
-            messages = isAI ? appState.aiMessages : appState.peerMessages
+            messages = isAI ? appState.aiMessages : peerMessagesForCurrent()
+        }
+        .onReceive(appState.$peerMessages) { newValue in
+            if !isAI {
+                let filtered = newValue.filter { $0.senderId == appState.chatPeerId }
+                if filtered != messages { messages = filtered }
+            }
         }
         .onChange(of: messages) { newValue in
-            if isAI { appState.aiMessages = newValue } else { appState.peerMessages = newValue }
+            if isAI { appState.aiMessages = newValue } else { writeBackPeerMessages(newValue) }
         }
         .onDisappear {
-            if isAI { appState.aiMessages = messages } else { appState.peerMessages = messages }
+            if isAI { appState.aiMessages = messages } else { writeBackPeerMessages(messages) }
         }
+    }
+
+    /// 当前会话的消息（按 chatPeerId 过滤）
+    private func peerMessagesForCurrent() -> [ChatMessage] {
+        appState.peerMessages.filter { $0.senderId == appState.chatPeerId }
+    }
+
+    /// 写回当前会话消息（合并进全局 peerMessages）
+    private func writeBackPeerMessages(_ sessionMsgs: [ChatMessage]) {
+        var all = appState.peerMessages.filter { $0.senderId != appState.chatPeerId }
+        all.append(contentsOf: sessionMsgs)
+        appState.peerMessages = all.sorted { $0.createdAt < $1.createdAt }
     }
 
     private var currentModel: ApiConfig.ModelInfo {
@@ -255,8 +279,8 @@ struct ChatView: View {
         if isAI {
             sendAI(text)
         } else {
-            // 对端加密发送
-            appState.transport.sendText(text, target: appState.chatPeerId)
+            // 对端加密发送（带 messageId 用于送达确认）
+            appState.transport.sendText(text, target: appState.chatPeerId, messageId: userMsg.id)
         }
     }
 
@@ -394,9 +418,9 @@ struct ChatView: View {
         let url = rec.url
         guard let data = try? Data(contentsOf: url), duration > 0.5 else { return }
         let b64 = data.base64EncodedString()
-        appState.transport.sendVoice(base64: b64, target: appState.chatPeerId, durationMs: duration * 1000)
         let msg = ChatMessage(role: "user", text: "", voiceBase64: b64, voiceDurationMs: duration * 1000, senderName: DeviceIdentity.shared.deviceName)
         messages.append(msg)
+        appState.transport.sendVoice(base64: b64, target: appState.chatPeerId, durationMs: duration * 1000, messageId: msg.id)
         try? FileManager.default.removeItem(at: url)
     }
 
@@ -438,6 +462,28 @@ struct MessageBubble: View {
     let isMine: Bool
     let isAI: Bool
     let deviceName: String
+    let playingVoiceId: String?
+    let onPlayVoice: (ChatMessage) -> Void
+    let onStopVoice: () -> Void
+
+    /// 送达状态图标（自己发的消息：✓ 已发送 / ✓✓ 已送达 / ! 失败）
+    @ViewBuilder
+    private var deliveryStatusIcon: some View {
+        switch msg.status {
+        case "delivered":
+            Image(systemName: "checkmark.circle.fill")
+                .font(.system(size: 10))
+                .foregroundColor(.green)
+        case "failed":
+            Image(systemName: "exclamationmark.circle.fill")
+                .font(.system(size: 10))
+                .foregroundColor(Theme.error)
+        default:
+            Image(systemName: "checkmark")
+                .font(.system(size: 10))
+                .foregroundColor(Theme.textTertiary)
+        }
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 8) {
@@ -453,9 +499,14 @@ struct MessageBubble: View {
 
             VStack(alignment: isMine ? .trailing : .leading, spacing: 3) {
                 if isMine {
-                    Text("我 · \(deviceName)")
-                        .font(.caption2)
-                        .foregroundColor(Theme.textTertiary)
+                    HStack(spacing: 4) {
+                        if msg.role == "user" && !isAI {
+                            deliveryStatusIcon
+                        }
+                        Text("我 · \(deviceName)")
+                            .font(.caption2)
+                            .foregroundColor(Theme.textTertiary)
+                    }
                 } else {
                     Text(isAI ? "AI 助手" : msg.senderName)
                         .font(.caption2)
@@ -503,9 +554,9 @@ struct MessageBubble: View {
                         if !msg.voiceBase64.isEmpty {
                             Button {
                                 if playingVoiceId == msg.id {
-                                    stopVoice()
+                                    onStopVoice()
                                 } else {
-                                    playVoice(msg)
+                                    onPlayVoice(msg)
                                 }
                             } label: {
                                 HStack(spacing: 8) {

@@ -109,6 +109,11 @@ final class RelayTransport: NSObject, ObservableObject {
                let plain = CryptoEngine.decrypt(data, passphrase: passphrase) {
                 payload["data"] = plain
             }
+            // 收到业务消息 → 自动回 ACK（携带原消息 id）
+            if ["text", "image", "voice"].contains(parsed.type),
+               let messageId = payload["messageId"] as? String, !messageId.isEmpty {
+                sendAck(messageId: messageId, target: parsed.senderId)
+            }
             onMessage?(parsed.type, parsed.from, parsed.senderId, payload)
         }
     }
@@ -159,35 +164,38 @@ final class RelayTransport: NSObject, ObservableObject {
         webSocket?.send(.string(text)) { _ in }
     }
 
-    /// 发送加密消息（E2E）
-    func sendEncrypted(type: String, target: String, content: String) {
+    /// 发送加密消息（E2E），messageId 用于送达确认
+    func sendEncrypted(type: String, target: String, content: String, messageId: String = "") {
         guard let enc = CryptoEngine.encrypt(content, passphrase: passphrase) else { return }
-        sendRaw(type: type, target: target, payload: ["data": enc, "target": target])
+        var payload: [String: Any] = ["data": enc, "target": target]
+        if !messageId.isEmpty { payload["messageId"] = messageId }
+        sendRaw(type: type, target: target, payload: payload)
     }
 
     /// 发送文本消息
-    func sendText(_ text: String, target: String) {
-        sendEncrypted(type: "text", target: target, content: text)
+    func sendText(_ text: String, target: String, messageId: String = "") {
+        sendEncrypted(type: "text", target: target, content: text, messageId: messageId)
     }
 
     /// 发送图片消息，data 字段保持端到端加密
-    func sendImage(base64: String, target: String, name: String = "image.jpg", mime: String = "image/jpeg", text: String = "") {
+    func sendImage(base64: String, target: String, name: String = "image.jpg", mime: String = "image/jpeg", text: String = "", messageId: String = "") {
         guard let enc = CryptoEngine.encrypt(base64, passphrase: passphrase) else { return }
-        sendRaw(
-            type: "image",
-            target: target,
-            payload: ["data": enc, "name": name, "mime": mime, "text": text, "target": target]
-        )
+        var payload: [String: Any] = ["data": enc, "name": name, "mime": mime, "text": text, "target": target]
+        if !messageId.isEmpty { payload["messageId"] = messageId }
+        sendRaw(type: "image", target: target, payload: payload)
     }
 
     /// 发送语音消息（AAC m4a Base64），data 字段端到端加密
-    func sendVoice(base64: String, target: String, durationMs: Double, mime: String = "audio/m4a") {
+    func sendVoice(base64: String, target: String, durationMs: Double, mime: String = "audio/m4a", messageId: String = "") {
         guard let enc = CryptoEngine.encrypt(base64, passphrase: passphrase) else { return }
-        sendRaw(
-            type: "voice",
-            target: target,
-            payload: ["data": enc, "mime": mime, "durationMs": durationMs, "target": target]
-        )
+        var payload: [String: Any] = ["data": enc, "mime": mime, "durationMs": durationMs, "target": target]
+        if !messageId.isEmpty { payload["messageId"] = messageId }
+        sendRaw(type: "voice", target: target, payload: payload)
+    }
+
+    /// 发送送达确认（ACK）
+    func sendAck(messageId: String, target: String) {
+        sendRaw(type: "ack", target: target, payload: ["ackId": messageId, "target": target])
     }
 
     /// 查询在线用户

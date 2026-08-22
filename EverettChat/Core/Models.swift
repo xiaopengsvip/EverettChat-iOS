@@ -13,10 +13,11 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     var senderName: String = ""
     var senderId: String = ""
     var isError: Bool = false
+    var status: String = "sent"   // sent | delivered | failed
     var createdAt: Date = Date()
 
     init(id: String = UUID().uuidString, role: String, text: String, imageBase64: String = "", voiceBase64: String = "", voiceDurationMs: Double = 0, reasoning: String = "",
-         senderName: String = "", senderId: String = "", isError: Bool = false) {
+         senderName: String = "", senderId: String = "", isError: Bool = false, status: String = "sent") {
         self.id = id
         self.role = role
         self.text = text
@@ -27,10 +28,11 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         self.senderName = senderName
         self.senderId = senderId
         self.isError = isError
+        self.status = status
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, role, text, imageBase64, voiceBase64, voiceDurationMs, reasoning, senderName, senderId, isError, createdAt
+        case id, role, text, imageBase64, voiceBase64, voiceDurationMs, reasoning, senderName, senderId, isError, status, createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -43,6 +45,7 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         senderName = try container.decodeIfPresent(String.self, forKey: .senderName) ?? ""
         senderId = try container.decodeIfPresent(String.self, forKey: .senderId) ?? ""
         isError = try container.decodeIfPresent(Bool.self, forKey: .isError) ?? false
+        status = try container.decodeIfPresent(String.self, forKey: .status) ?? "sent"
         createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
     }
 }
