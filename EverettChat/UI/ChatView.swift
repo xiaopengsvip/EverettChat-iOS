@@ -117,6 +117,31 @@ struct ChatView: View {
                     .padding(.bottom, 4)
                 }
 
+                // +号附件面板（微信风格网格，输入框上方展开）
+                if showPlusPanel {
+                    AttachmentPanel(
+                        onAlbum: { showPhotoPicker = true },
+                        onCamera: { showCamera = true },
+                        onFile: { showFilePicker = true },
+                        onVoiceCall: { voiceHintText = "语音电话即将上线"; showVoiceHint = true },
+                        onVideoCall: { voiceHintText = "视频电话即将上线"; showVoiceHint = true },
+                        onNamecard: {
+                            let card = "我的 ID: \(DeviceIdentity.shared.shortId) · 昵称: \(DeviceIdentity.shared.deviceName)"
+                            if isAI {
+                                let msg = ChatMessage(role: "user", text: card)
+                                messages.append(msg)
+                                sendAI(text: card, imageBase64: "")
+                            } else {
+                                let msg = ChatMessage(role: "user", text: card, senderId: appState.chatPeerId)
+                                messages.append(msg)
+                                appState.transport.sendText(card, target: appState.chatPeerId, messageId: msg.id)
+                            }
+                            showPlusPanel = false
+                        }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
                 // 输入区（独立组件，含 +号/按住录音/发送）
                 ChatInputBar(
                     input: $input,
@@ -125,12 +150,13 @@ struct ChatView: View {
                     isRecording: isRecording,
                     isVoiceSlidingUp: isVoiceSlidingUp,
                     recordingSeconds: recordingSeconds,
-                    onPlus: { showPlusPanel = true },
+                    onPlus: { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showPlusPanel.toggle() } },
                     onSend: { send() },
                     onStartRecord: { startRecording() },
                     onEndRecord: { stopRecordingAndSend() },
                     onCancelRecord: { cancelRecording() },
-                    onSlideUpChange: { up in isVoiceSlidingUp = up }
+                    onSlideUpChange: { up in isVoiceSlidingUp = up },
+                    onDragChange: { h in voiceDragOffset = h }
                 )
                 .padding(.horizontal, Spacing.md)
                 .padding(.vertical, Spacing.sm)
@@ -139,6 +165,20 @@ struct ChatView: View {
             .background(.thinMaterial)
         }
         .background(Theme.bg)
+        // 微信式录音浮层（按住录音时显示）
+        .overlay {
+            if isRecording {
+                RecordingOverlay(
+                    seconds: recordingSeconds,
+                    dragOffset: voiceDragOffset,
+                    onCancel: { cancelRecording() },
+                    onToText: { voiceHintText = "语音转文字即将上线"; showVoiceHint = true; cancelRecording() },
+                    onSend: { stopRecordingAndSend() }
+                )
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: isRecording)
         // 语音提示浮层（录音提示/功能提示）
         .overlay(alignment: .top) {
             if showVoiceHint {
@@ -148,27 +188,6 @@ struct ChatView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: showVoiceHint)
-        // +号模块面板
-        .confirmationDialog("功能", isPresented: $showPlusPanel, titleVisibility: .visible) {
-            Button("📷 相册") { showPhotoPicker = true }
-            Button("📁 文件") { showFilePicker = true }
-            Button("📸 拍摄") { showCamera = true }
-            Button("📞 语音电话") { voiceHintText = "语音电话即将上线"; showVoiceHint = true }
-            Button("📹 视频电话") { voiceHintText = "视频电话即将上线"; showVoiceHint = true }
-            Button("👤 个人名片") {
-                let card = "我的 ID: \(DeviceIdentity.shared.shortId) · 昵称: \(DeviceIdentity.shared.deviceName)"
-                if isAI {
-                    let msg = ChatMessage(role: "user", text: card)
-                    messages.append(msg)
-                    sendAI(text: card, imageBase64: "")
-                } else {
-                    let msg = ChatMessage(role: "user", text: card, senderId: appState.chatPeerId)
-                    messages.append(msg)
-                    appState.transport.sendText(card, target: appState.chatPeerId, messageId: msg.id)
-                }
-            }
-            Button("取消", role: .cancel) {}
-        }
         .sheet(isPresented: $showModelSheet) { ModelPickerSheet(selected: $selectedModel) }
         .sheet(isPresented: $showInfoSheet) { ChatInfoSheet(isAI: isAI) }
         // 文件选择器
@@ -773,7 +792,7 @@ struct VoiceHintBubble: View {
     }
 }
 
-/// 输入区组件：+号功能 / 文本框 / 按住录音(上滑取消) / 发送
+/// 输入区组件：+号功能 / 文本框 / 按住录音(上滑取消/转文字) / 发送
 struct ChatInputBar: View {
     @Binding var input: String
     let isAI: Bool
@@ -787,6 +806,7 @@ struct ChatInputBar: View {
     let onEndRecord: () -> Void
     let onCancelRecord: () -> Void
     let onSlideUpChange: (Bool) -> Void
+    let onDragChange: (CGFloat) -> Void
 
     var body: some View {
         HStack(spacing: Spacing.sm) {
@@ -821,39 +841,35 @@ struct ChatInputBar: View {
     }
 
     private var voiceButton: some View {
-        ZStack {
-            if isRecording {
-                Text(isVoiceSlidingUp ? "⬆️ 松开取消" : String(format: "%.0f\"", recordingSeconds))
-                    .font(.caption)
-                    .foregroundColor(isVoiceSlidingUp ? Theme.error : Theme.textSecondary)
-                    .offset(y: -36)
-                    .transition(.scale.combined(with: .opacity))
-            }
-            Image(systemName: isRecording ? "waveform" : "mic.fill")
-                .font(.system(size: 18))
-                .foregroundColor(isRecording ? (isVoiceSlidingUp ? Theme.error : Theme.primary) : Theme.textSecondary)
-                .frame(width: 44, height: 44)
-                .background(
-                    Circle().fill(isRecording ? (isVoiceSlidingUp ? Theme.error.opacity(0.15) : Theme.primary.opacity(0.15)) : .clear)
-                )
-                .gesture(
-                    DragGesture(minimumDistance: 0)
-                        .onChanged { value in
-                            if !isRecording {
-                                onStartRecord()
-                            }
-                            onSlideUpChange(value.translation.height < -60)
+        Image(systemName: isRecording ? "waveform" : "mic.fill")
+            .font(.system(size: 18))
+            .foregroundColor(isRecording ? (isVoiceSlidingUp ? Theme.error : Theme.primary) : Theme.textSecondary)
+            .frame(width: 44, height: 44)
+            .background(
+                Circle().fill(isRecording ? (isVoiceSlidingUp ? Theme.error.opacity(0.15) : Theme.primary.opacity(0.15)) : .clear)
+            )
+            .gesture(
+                DragGesture(minimumDistance: 0)
+                    .onChanged { value in
+                        if !isRecording {
+                            onStartRecord()
                         }
-                        .onEnded { value in
-                            if isVoiceSlidingUp {
-                                onCancelRecord()
-                            } else {
-                                onEndRecord()
-                            }
-                            onSlideUpChange(false)
+                        onSlideUpChange(value.translation.height < -60)
+                        onDragChange(value.translation.height)
+                    }
+                    .onEnded { value in
+                        onSlideUpChange(false)
+                        onDragChange(0)
+                        // 上滑超过 140 → 转文字；超过 60 → 取消；否则发送
+                        if value.translation.height < -140 {
+                            // 转文字（即将上线）
+                        } else if value.translation.height < -60 {
+                            onCancelRecord()
+                        } else {
+                            onEndRecord()
                         }
-                )
-        }
+                    }
+            )
     }
 
     private var sendButton: some View {
@@ -977,6 +993,155 @@ struct ModelSwitcherRow: View {
                 .font(.caption2)
                 .foregroundColor(Theme.textTertiary)
             Spacer()
+        }
+    }
+}
+
+/// 附件面板（微信风格网格：相册/拍摄/文件/语音电话/视频电话/个人名片）
+struct AttachmentPanel: View {
+    let onAlbum: () -> Void
+    let onCamera: () -> Void
+    let onFile: () -> Void
+    let onVoiceCall: () -> Void
+    let onVideoCall: () -> Void
+    let onNamecard: () -> Void
+
+    private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
+
+    var body: some View {
+        LazyVGrid(columns: columns, spacing: 16) {
+            AttachmentItem(icon: "photo.on.rectangle.angled", color: Color(hex: 0x34C759), label: "相册", action: onAlbum)
+            AttachmentItem(icon: "camera.fill", color: Color(hex: 0x007AFF), label: "拍摄", action: onCamera)
+            AttachmentItem(icon: "folder.fill", color: Color(hex: 0xFF9500), label: "文件", action: onFile)
+            AttachmentItem(icon: "phone.fill", color: Color(hex: 0x34C759), label: "语音通话", action: onVoiceCall)
+            AttachmentItem(icon: "video.fill", color: Color(hex: 0xAF52DE), label: "视频通话", action: onVideoCall)
+            AttachmentItem(icon: "person.crop.square.fill", color: Color(hex: 0x007AFF), label: "名片", action: onNamecard)
+        }
+        .padding(.horizontal, Spacing.xl)
+        .padding(.vertical, Spacing.lg)
+        .frame(maxWidth: .infinity)
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Radius.large, style: .continuous))
+        .padding(.horizontal, Spacing.sm)
+        .padding(.bottom, Spacing.sm)
+    }
+}
+
+/// 附件网格单项
+struct AttachmentItem: View {
+    let icon: String
+    let color: Color
+    let label: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            VStack(spacing: 8) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .fill(color.opacity(0.15))
+                        .frame(width: 56, height: 56)
+                    Image(systemName: icon)
+                        .font(.system(size: 24))
+                        .foregroundColor(color)
+                }
+                Text(label)
+                    .font(.caption)
+                    .foregroundColor(Theme.textSecondary)
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// 微信式录音浮层：绿色气泡+波形 / 松手提示 / 取消·转文字
+struct RecordingOverlay: View {
+    let seconds: Double
+    let dragOffset: CGFloat
+    let onCancel: () -> Void
+    let onToText: () -> Void
+    let onSend: () -> Void
+
+    private var mode: RecordingMode {
+        if dragOffset < -140 { return .toText }
+        if dragOffset < -60 { return .cancel }
+        return .send
+    }
+
+    enum RecordingMode {
+        case send, cancel, toText
+    }
+
+    var body: some View {
+        ZStack {
+            // 半透明黑底
+            Color.black.opacity(0.45).ignoresSafeArea()
+
+            VStack(spacing: 20) {
+                // 绿色气泡 + 波形
+                ZStack(alignment: .bottom) {
+                    RoundedRectangle(cornerRadius: 20, style: .continuous)
+                        .fill(mode == .cancel ? Color.red : Color(hex: 0x07C160))
+                        .frame(width: 220, height: 150)
+
+                    // 波形（录音动画）
+                    WaveformBars(isActive: true, color: .white)
+                        .frame(width: 180, height: 60)
+                        .padding(.bottom, 30)
+
+                    Text(String(format: "%.0f\"", seconds))
+                        .font(.caption)
+                        .foregroundColor(.white.opacity(0.9))
+                        .padding(.bottom, 10)
+                }
+
+                // 松手提示
+                Text(mode == .cancel ? "松手 取消" : (mode == .toText ? "松手 转文字" : "松手 发语音"))
+                    .font(.headline)
+                    .foregroundColor(mode == .cancel ? .red : (mode == .toText ? Color(hex: 0x07C160) : .white))
+
+                // 底部按钮：取消 / 滑到这里转文字
+                HStack(spacing: 16) {
+                    Button(action: onCancel) {
+                        Text("取消")
+                            .font(.body.weight(.medium))
+                            .foregroundColor(.white)
+                            .frame(width: 100, height: 44)
+                            .background(Capsule().fill(Color.white.opacity(0.2)))
+                    }
+
+                    Button(action: onToText) {
+                        Text("滑到这里\n转文字")
+                            .font(.caption)
+                            .multilineTextAlignment(.center)
+                            .foregroundColor(.white)
+                            .frame(width: 100, height: 44)
+                            .background(Capsule().fill(mode == .toText ? Color(hex: 0x07C160) : Color.white.opacity(0.2)))
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// 录音波形（动态竖条）
+struct WaveformBars: View {
+    let isActive: Bool
+    let color: Color
+
+    var body: some View {
+        TimelineView(.animation) { timeline in
+            let time = timeline.date.timeIntervalSinceReferenceDate
+            HStack(alignment: .center, spacing: 3) {
+                ForEach(0..<28, id: \.self) { i in
+                    let phase = sin(time * 8 + Double(i) * 0.6)
+                    let height = isActive ? (8 + abs(phase) * 22) : 6
+                    RoundedRectangle(cornerRadius: 2)
+                        .fill(color)
+                        .frame(width: 3, height: height)
+                }
+            }
+            .frame(height: 60)
         }
     }
 }
