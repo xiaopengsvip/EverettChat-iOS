@@ -7,7 +7,12 @@ import Combine
 final class AppState: ObservableObject {
     static let shared = AppState()
 
-    private init() {}
+    private init() {
+        let stored = MessageStore.loadAll()
+        conversations = stored.conversations
+        aiMessages = stored.aiMessages
+        peerMessages = stored.peerMessages
+    }
 
     // 设备信息
     let deviceId = DeviceIdentity.shared.deviceId
@@ -20,9 +25,15 @@ final class AppState: ObservableObject {
     )
 
     // 会话与消息
-    @Published var conversations: [Conversation] = []
-    @Published var aiMessages: [ChatMessage] = []
-    @Published var peerMessages: [ChatMessage] = []
+    @Published var conversations: [Conversation] = [] {
+        didSet { MessageStore.saveConversations(conversations) }
+    }
+    @Published var aiMessages: [ChatMessage] = [] {
+        didSet { MessageStore.saveAiMessages(aiMessages) }
+    }
+    @Published var peerMessages: [ChatMessage] = [] {
+        didSet { MessageStore.savePeerMessages(peerMessages) }
+    }
     @Published var activeConvId: String? = nil
 
     // 联系人
@@ -84,6 +95,7 @@ final class AppState: ObservableObject {
         chatMode = "ai"
         chatPeerName = "AI 助手"
         chatPeerId = "ai"
+        activeConvId = "ai"
         showChat = true
     }
 
@@ -91,6 +103,7 @@ final class AppState: ObservableObject {
         chatMode = "peer"
         chatPeerName = name
         chatPeerId = peerId
+        activeConvId = peerId
         showChat = true
     }
 

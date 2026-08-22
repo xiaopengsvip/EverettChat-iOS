@@ -154,6 +154,9 @@ struct ChatView: View {
         .onAppear {
             messages = isAI ? appState.aiMessages : appState.peerMessages
         }
+        .onChange(of: messages) { newValue in
+            if isAI { appState.aiMessages = newValue } else { appState.peerMessages = newValue }
+        }
         .onDisappear {
             if isAI { appState.aiMessages = messages } else { appState.peerMessages = messages }
         }
@@ -172,7 +175,7 @@ struct ChatView: View {
         guard !text.isEmpty, !isStreaming else { return }
         input = ""
 
-        let userMsg = ChatMessage(role: "user", text: text)
+        let userMsg = ChatMessage(role: "user", text: text, senderId: isAI ? "" : appState.chatPeerId)
         messages.append(userMsg)
 
         if isAI {

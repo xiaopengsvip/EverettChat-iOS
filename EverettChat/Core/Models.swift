@@ -2,7 +2,7 @@ import Foundation
 import CryptoKit
 
 /// 消息模型
-struct ChatMessage: Identifiable, Codable {
+struct ChatMessage: Identifiable, Codable, Equatable {
     let id: String
     var role: String          // user | ai | peer
     var text: String
