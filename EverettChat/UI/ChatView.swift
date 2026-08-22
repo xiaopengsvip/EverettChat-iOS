@@ -37,6 +37,10 @@ struct ChatView: View {
     @State private var isVoiceSlidingUp = false
     @State private var voiceDragOffset: CGFloat = 0
     @State private var voiceHintText = ""
+    // 语音/键盘切换模式
+    @State private var voiceMode = false
+    // 表情面板
+    @State private var showEmojiPanel = false
 
     private var isAI: Bool { appState.chatMode == "ai" }
     private let apiClient = ChatApiClient()
@@ -124,7 +128,21 @@ struct ChatView: View {
                         onCamera: { showCamera = true },
                         onFile: { showFilePicker = true },
                         onVoiceCall: { voiceHintText = "语音电话即将上线"; showVoiceHint = true },
-                        onVideoCall: { voiceHintText = "视频电话即将上线"; showVoiceHint = true },
+                        onLocation: {
+                            voiceHintText = "位置功能即将上线"; showVoiceHint = true
+                        },
+                        onRedPacket: {
+                            voiceHintText = "红包功能即将上线"; showVoiceHint = true
+                        },
+                        onGift: {
+                            voiceHintText = "礼物功能即将上线"; showVoiceHint = true
+                        },
+                        onTransfer: {
+                            voiceHintText = "转账功能即将上线"; showVoiceHint = true
+                        },
+                        onVoiceInput: {
+                            voiceHintText = "语音输入即将上线"; showVoiceHint = true
+                        },
                         onNamecard: {
                             let card = "我的 ID: \(DeviceIdentity.shared.shortId) · 昵称: \(DeviceIdentity.shared.deviceName)"
                             if isAI {
@@ -142,15 +160,40 @@ struct ChatView: View {
                     .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
 
-                // 输入区（独立组件，含 +号/按住录音/发送）
+                // 表情面板
+                if showEmojiPanel {
+                    EmojiPanel { emoji in
+                        input += emoji
+                        showEmojiPanel = false
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
+                // 输入区（微信布局：语音切换 + 输入框/按住说话 + 表情 + 加号）
                 ChatInputBar(
                     input: $input,
                     isAI: isAI,
                     peerName: appState.chatPeerName,
+                    voiceMode: voiceMode,
                     isRecording: isRecording,
                     isVoiceSlidingUp: isVoiceSlidingUp,
                     recordingSeconds: recordingSeconds,
-                    onPlus: { withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { showPlusPanel.toggle() } },
+                    onToggleVoiceMode: {
+                        voiceMode.toggle()
+                        showEmojiPanel = false
+                        showPlusPanel = false
+                    },
+                    onEmoji: {
+                        showEmojiPanel.toggle()
+                        showPlusPanel = false
+                        voiceMode = false
+                    },
+                    onPlus: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showPlusPanel.toggle()
+                            showEmojiPanel = false
+                        }
+                    },
                     onSend: { send() },
                     onStartRecord: { startRecording() },
                     onEndRecord: { stopRecordingAndSend() },
@@ -792,14 +835,17 @@ struct VoiceHintBubble: View {
     }
 }
 
-/// 输入区组件：+号功能 / 文本框 / 按住录音(上滑取消/转文字) / 发送
+/// 输入区组件（微信布局）：语音切换 + 输入框/按住说话 + 表情 + 加号
 struct ChatInputBar: View {
     @Binding var input: String
     let isAI: Bool
     let peerName: String
+    let voiceMode: Bool
     let isRecording: Bool
     let isVoiceSlidingUp: Bool
     let recordingSeconds: Double
+    let onToggleVoiceMode: () -> Void
+    let onEmoji: () -> Void
     let onPlus: () -> Void
     let onSend: () -> Void
     let onStartRecord: () -> Void
@@ -810,214 +856,115 @@ struct ChatInputBar: View {
 
     var body: some View {
         HStack(spacing: Spacing.sm) {
-            plusButton
-            textField
-            if input.isEmpty {
-                voiceButton
-            } else {
-                sendButton
+            // 语音/键盘切换
+            Button(action: onToggleVoiceMode) {
+                Image(systemName: voiceMode ? "keyboard" : "waveform")
+                    .font(.system(size: 20))
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(width: 36, height: 40)
             }
-        }
-    }
 
-    private var plusButton: some View {
-        Button(action: onPlus) {
-            Image(systemName: "plus.circle.fill")
-                .font(.system(size: 22))
-                .foregroundColor(Theme.textSecondary)
-                .frame(width: 40, height: 40)
-        }
-    }
-
-    private var textField: some View {
-        TextField(isAI ? "向 AI 提问..." : "加密消息给 \(peerName)...", text: $input)
-            .textFieldStyle(.plain)
-            .font(.body)
-            .padding(.horizontal, 14)
-            .frame(height: 40)
-            .background(RoundedRectangle(cornerRadius: 20).fill(Theme.surfaceHigh))
-            .submitLabel(.send)
-            .onSubmit(onSend)
-    }
-
-    private var voiceButton: some View {
-        Image(systemName: isRecording ? "waveform" : "mic.fill")
-            .font(.system(size: 18))
-            .foregroundColor(isRecording ? (isVoiceSlidingUp ? Theme.error : Theme.primary) : Theme.textSecondary)
-            .frame(width: 44, height: 44)
-            .background(
-                Circle().fill(isRecording ? (isVoiceSlidingUp ? Theme.error.opacity(0.15) : Theme.primary.opacity(0.15)) : .clear)
-            )
-            .gesture(
-                DragGesture(minimumDistance: 0)
-                    .onChanged { value in
-                        if !isRecording {
-                            onStartRecord()
-                        }
-                        onSlideUpChange(value.translation.height < -60)
-                        onDragChange(value.translation.height)
-                    }
-                    .onEnded { value in
-                        onSlideUpChange(false)
-                        onDragChange(0)
-                        // 上滑超过 140 → 转文字；超过 60 → 取消；否则发送
-                        if value.translation.height < -140 {
-                            // 转文字（即将上线）
-                        } else if value.translation.height < -60 {
-                            onCancelRecord()
-                        } else {
-                            onEndRecord()
-                        }
-                    }
-            )
-    }
-
-    private var sendButton: some View {
-        Button(action: onSend) {
-            Image(systemName: "paperplane.fill")
-                .font(.system(size: 18))
-                .foregroundColor(.white)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(Theme.primary))
-        }
-    }
-}
-
-/// 消息列表（ScrollView + 气泡 + contextMenu + 自动滚动）
-struct MessageListView: View {
-    let messages: [ChatMessage]
-    let isAI: Bool
-    let isStreaming: Bool
-    let streamContent: String
-    let streamReasoning: String
-    let deviceName: String
-    let playingVoiceId: String?
-    let onPlayVoice: (ChatMessage) -> Void
-    let onStopVoice: () -> Void
-    let onCopy: (ChatMessage) -> Void
-    let onRegenerate: (ChatMessage) -> Void
-    let onDelete: (ChatMessage) -> Void
-    let onCountChange: (ScrollViewProxy) -> Void
-    let onStreamChange: (ScrollViewProxy) -> Void
-
-    var body: some View {
-        ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    Text(isAI ? "🤖 与 AI 助手对话 · 经云端中继" : "🔐 端到端加密 · 消息仅双方可见")
-                        .font(.caption2)
-                        .foregroundColor(Theme.textTertiary)
-                        .padding(.vertical, 4)
-
-                    ForEach(messages) { msg in
-                        MessageBubble(
-                            msg: msg,
-                            isMine: msg.role == "user",
-                            isAI: msg.role == "ai",
-                            deviceName: deviceName,
-                            playingVoiceId: playingVoiceId,
-                            onPlayVoice: onPlayVoice,
-                            onStopVoice: onStopVoice
-                        )
-                        .id(msg.id)
-                        .contextMenu {
-                            Button {
-                                onCopy(msg)
-                            } label: {
-                                Label("复制", systemImage: "doc.on.doc")
+            if voiceMode {
+                // 按住说话（微信样式）
+                Text(isRecording ? (isVoiceSlidingUp ? "松开 取消" : "松开 发送") : "按住 说话")
+                    .font(.body)
+                    .foregroundColor(isRecording ? (isVoiceSlidingUp ? Theme.error : Theme.primary) : Theme.textTertiary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+                    .background(
+                        RoundedRectangle(cornerRadius: 20)
+                            .fill(isRecording ? (isVoiceSlidingUp ? Theme.error.opacity(0.15) : Theme.primary.opacity(0.15)) : Theme.surfaceHigh)
+                    )
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { value in
+                                if !isRecording { onStartRecord() }
+                                onSlideUpChange(value.translation.height < -60)
+                                onDragChange(value.translation.height)
                             }
-
-                            if isAI && msg.role == "ai" {
-                                Button {
-                                    onRegenerate(msg)
-                                } label: {
-                                    Label("重新生成", systemImage: "arrow.clockwise")
+                            .onEnded { value in
+                                onSlideUpChange(false)
+                                onDragChange(0)
+                                if value.translation.height < -140 {
+                                    // 转文字（即将上线）
+                                    onCancelRecord()
+                                } else if value.translation.height < -60 {
+                                    onCancelRecord()
+                                } else {
+                                    onEndRecord()
                                 }
-                                .disabled(isStreaming)
                             }
+                    )
+            } else {
+                TextField(isAI ? "向 AI 提问..." : "加密消息给 \(peerName)...", text: $input)
+                    .textFieldStyle(.plain)
+                    .font(.body)
+                    .padding(.horizontal, 14)
+                    .frame(height: 40)
+                    .background(RoundedRectangle(cornerRadius: 20).fill(Theme.surfaceHigh))
+                    .submitLabel(.send)
+                    .onSubmit(onSend)
+            }
 
-                            Button(role: .destructive) {
-                                onDelete(msg)
-                            } label: {
-                                Label("删除", systemImage: "trash")
-                            }
-                        }
-                    }
-                    if isStreaming {
-                        MessageBubble(
-                            msg: ChatMessage(role: "ai", text: streamContent, reasoning: streamReasoning),
-                            isMine: false, isAI: true, deviceName: deviceName,
-                            playingVoiceId: nil,
-                            onPlayVoice: { _ in },
-                            onStopVoice: {}
-                        )
-                        .id("streaming")
-                    }
+            // 表情按钮
+            Button(action: onEmoji) {
+                Image(systemName: "face.smiling")
+                    .font(.system(size: 20))
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(width: 36, height: 40)
+            }
+
+            // 加号
+            Button(action: onPlus) {
+                Image(systemName: "plus.circle.fill")
+                    .font(.system(size: 22))
+                    .foregroundColor(Theme.textSecondary)
+                    .frame(width: 36, height: 40)
+            }
+
+            // 发送（有文字时）
+            if !input.isEmpty {
+                Button(action: onSend) {
+                    Image(systemName: "paperplane.fill")
+                        .font(.system(size: 18))
+                        .foregroundColor(.white)
+                        .frame(width: 44, height: 44)
+                        .background(Circle().fill(Theme.primary))
                 }
-                .padding(.horizontal, Spacing.md)
-                .padding(.vertical, Spacing.sm)
-            }
-            .onChange(of: messages.count) { _ in
-                onCountChange(proxy)
-            }
-            .onChange(of: streamContent) { _ in
-                onStreamChange(proxy)
             }
         }
     }
 }
 
-/// AI 模型切换行
-struct ModelSwitcherRow: View {
-    let icon: String
-    let name: String
-    let onTap: () -> Void
-
-    var body: some View {
-        HStack(spacing: Spacing.sm) {
-            Button(action: onTap) {
-                HStack(spacing: 4) {
-                    Text("\(icon) \(name) ▾")
-                        .font(.caption)
-                        .foregroundColor(Theme.primary)
-                }
-                .padding(.horizontal, 12)
-                .padding(.vertical, 6)
-                .background(
-                    RoundedRectangle(cornerRadius: 14)
-                        .fill(Theme.primary.opacity(0.15))
-                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.primary.opacity(0.35), lineWidth: 1))
-                )
-            }
-            Text("切换模型")
-                .font(.caption2)
-                .foregroundColor(Theme.textTertiary)
-            Spacer()
-        }
-    }
-}
-
-/// 附件面板（微信风格网格：相册/拍摄/文件/语音电话/视频电话/个人名片）
+/// 附件面板（微信风格 2行网格：照片/拍摄/语音通话/位置/红包/礼物/转账/语音输入）
 struct AttachmentPanel: View {
     let onAlbum: () -> Void
     let onCamera: () -> Void
     let onFile: () -> Void
     let onVoiceCall: () -> Void
-    let onVideoCall: () -> Void
+    let onLocation: () -> Void
+    let onRedPacket: () -> Void
+    let onGift: () -> Void
+    let onTransfer: () -> Void
+    let onVoiceInput: () -> Void
     let onNamecard: () -> Void
 
     private let columns = [GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12), GridItem(.flexible(), spacing: 12)]
 
     var body: some View {
-        LazyVGrid(columns: columns, spacing: 16) {
-            AttachmentItem(icon: "photo.on.rectangle.angled", color: Color(hex: 0x34C759), label: "相册", action: onAlbum)
+        LazyVGrid(columns: columns, spacing: 14) {
+            AttachmentItem(icon: "photo.on.rectangle.angled", color: Color(hex: 0x34C759), label: "照片", action: onAlbum)
             AttachmentItem(icon: "camera.fill", color: Color(hex: 0x007AFF), label: "拍摄", action: onCamera)
             AttachmentItem(icon: "folder.fill", color: Color(hex: 0xFF9500), label: "文件", action: onFile)
             AttachmentItem(icon: "phone.fill", color: Color(hex: 0x34C759), label: "语音通话", action: onVoiceCall)
-            AttachmentItem(icon: "video.fill", color: Color(hex: 0xAF52DE), label: "视频通话", action: onVideoCall)
+            AttachmentItem(icon: "location.fill", color: Color(hex: 0xFF3B30), label: "位置", action: onLocation)
+            AttachmentItem(icon: "gift.fill", color: Color(hex: 0xFF3B30), label: "红包", action: onRedPacket)
+            AttachmentItem(icon: "gift.circle.fill", color: Color(hex: 0xFF9500), label: "礼物", action: onGift)
+            AttachmentItem(icon: "arrow.left.arrow.right", color: Color(hex: 0x007AFF), label: "转账", action: onTransfer)
+            AttachmentItem(icon: "mic.circle.fill", color: Color(hex: 0xAF52DE), label: "语音输入", action: onVoiceInput)
             AttachmentItem(icon: "person.crop.square.fill", color: Color(hex: 0x007AFF), label: "名片", action: onNamecard)
         }
-        .padding(.horizontal, Spacing.xl)
+        .padding(.horizontal, Spacing.lg)
         .padding(.vertical, Spacing.lg)
         .frame(maxWidth: .infinity)
         .background(Theme.surface)
@@ -1143,5 +1090,37 @@ struct WaveformBars: View {
             }
             .frame(height: 60)
         }
+    }
+}
+
+/// 表情面板（常用 emoji 网格）
+struct EmojiPanel: View {
+    let onSelect: (String) -> Void
+
+    private let emojis: [String] = [
+        "😀","😄","😁","😂","🤣","😊","😍","🥰","😘","😎","🤔","😴","👍","👎","👏","🙏",
+        "🔥","💯","🎉","🎊","❤️","💔","💖","⭐","✅","❌","❓","❗","💪","🤝","👋","✌️",
+        "🎮","🎧","🎬","📷","🎁","💰","📱","💻","☕","🍺","🍜","🍎","🚀","🌙","☀️","🌈"
+    ]
+
+    var body: some View {
+        LazyVGrid(columns: [GridItem(.adaptive(minimum: 44))], spacing: 8) {
+            ForEach(emojis, id: \.self) { emoji in
+                Button {
+                    onSelect(emoji)
+                } label: {
+                    Text(emoji)
+                        .font(.system(size: 28))
+                        .frame(width: 44, height: 44)
+                }
+                .buttonStyle(.plain)
+            }
+        }
+        .padding(Spacing.md)
+        .frame(maxWidth: .infinity, maxHeight: 220)
+        .background(Theme.surface)
+        .clipShape(RoundedRectangle(cornerRadius: Radius.large, style: .continuous))
+        .padding(.horizontal, Spacing.sm)
+        .padding(.bottom, Spacing.sm)
     }
 }
