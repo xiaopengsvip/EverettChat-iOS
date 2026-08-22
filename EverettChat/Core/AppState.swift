@@ -64,18 +64,25 @@ final class AppState: ObservableObject {
             case "text":
                 guard let text = payload["data"] as? String else { return }
                 let message = ChatMessage(role: "peer", text: text, senderName: from, senderId: senderId)
-                let now = message.createdAt
                 self.peerMessages.append(message)
-
-                if let index = self.conversations.firstIndex(where: { $0.id == senderId }) {
-                    self.conversations[index].name = from
-                    self.conversations[index].lastText = text
-                    self.conversations[index].lastTime = now
-                } else {
-                    self.conversations.append(
-                        Conversation(id: senderId, name: from, type: "peer", lastText: text, lastTime: now)
-                    )
-                }
+                self.updatePeerConversation(senderId: senderId, name: from, lastText: text, time: message.createdAt)
+            case "image":
+                guard let imageBase64 = payload["data"] as? String else { return }
+                let text = payload["text"] as? String ?? ""
+                let message = ChatMessage(
+                    role: "peer",
+                    text: text,
+                    imageBase64: imageBase64,
+                    senderName: from,
+                    senderId: senderId
+                )
+                self.peerMessages.append(message)
+                self.updatePeerConversation(
+                    senderId: senderId,
+                    name: from,
+                    lastText: text.isEmpty ? "[图片]" : text,
+                    time: message.createdAt
+                )
             default:
                 break
             }
@@ -125,6 +132,18 @@ final class AppState: ObservableObject {
                     // 请求成功
                 }
             } catch {}
+        }
+    }
+
+    func updatePeerConversation(senderId: String, name: String, lastText: String, time: Date = Date()) {
+        if let index = conversations.firstIndex(where: { $0.id == senderId }) {
+            conversations[index].name = name
+            conversations[index].lastText = lastText
+            conversations[index].lastTime = time
+        } else {
+            conversations.append(
+                Conversation(id: senderId, name: name, type: "peer", lastText: lastText, lastTime: time)
+            )
         }
     }
 }

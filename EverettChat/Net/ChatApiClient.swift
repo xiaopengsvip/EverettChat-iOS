@@ -22,6 +22,8 @@ final class ChatApiClient: ObservableObject {
                      model: String = ApiConfig.model,
                      onDelta: @escaping (String, Bool) -> Void) async -> String? {
         cancelFlag = false
+        streamText = ""
+        reasoningText = ""
         isStreaming = true
         defer { isStreaming = false }
 
@@ -63,6 +65,95 @@ final class ChatApiClient: ObservableObject {
                 if cancelFlag { break }
                 buffer.append(byte)
                 if byte == 0x0A {   // '\n'
+                    let line = String(data: buffer, encoding: .utf8) ?? ""
+                    buffer = Data()
+                    let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                    guard trimmed.hasPrefix("data:") else { continue }
+                    let data = String(trimmed.dropFirst(5)).trimmingCharacters(in: .whitespaces)
+                    if data.isEmpty || data == "[DONE]" { continue }
+                    if let json = try? JSONSerialization.jsonObject(with: Data(data.utf8)) as? [String: Any],
+                       let choices = json["choices"] as? [[String: Any]],
+                       let delta = choices.first?["delta"] as? [String: Any] {
+                        let content = delta["content"] as? String ?? ""
+                        let reasoning = delta["reasoning_content"] as? String ?? ""
+                        if !reasoning.isEmpty { reasoningBuf += reasoning }
+                        if !content.isEmpty {
+                            full += content
+                            contentBuf += content
+                        }
+                        if Date().timeIntervalSince(lastFlush) >= 0.05 {
+                            flush(&reasoningBuf, &contentBuf, onDelta)
+                            lastFlush = Date()
+                        }
+                    }
+                }
+            }
+            flush(&reasoningBuf, &contentBuf, onDelta)
+            isStreaming = false
+            return full.isEmpty ? nil : full
+        } catch {
+            return nil
+        }
+    }
+
+    /// 发送图片给视觉模型，图片使用 OpenAI 兼容的 data URL content 格式
+    func sendImageMessage(history: [(role: String, content: String)],
+                          userMessage: String,
+                          imageBase64: String,
+                          model: String = ApiConfig.visionModel,
+                          onDelta: @escaping (String, Bool) -> Void) async -> String? {
+        cancelFlag = false
+        streamText = ""
+        reasoningText = ""
+        isStreaming = true
+        defer { isStreaming = false }
+
+        let prompt = userMessage.isEmpty ? "请描述这张图片。" : userMessage
+        let imageURL = "data:image/jpeg;base64,\(imageBase64)"
+        var messages: [[String: Any]] = [["role": "system", "content": ApiConfig.systemPrompt]]
+        for h in history {
+            messages.append(["role": h.role, "content": h.content])
+        }
+        messages.append([
+            "role": "user",
+            "content": [
+                ["type": "text", "text": prompt],
+                ["type": "image_url", "image_url": ["url": imageURL]]
+            ]
+        ])
+
+        let body: [String: Any] = [
+            "model": model,
+            "messages": messages,
+            "stream": true,
+            "temperature": 0.7,
+            "max_tokens": 2048
+        ]
+
+        guard let url = URL(string: "\(ApiConfig.baseURL)/chat/completions"),
+              let jsonData = try? JSONSerialization.data(withJSONObject: body) else { return nil }
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15", forHTTPHeaderField: "User-Agent")
+        request.setValue("identity", forHTTPHeaderField: "Accept-Encoding")
+        request.httpBody = jsonData
+        request.timeoutInterval = 120
+
+        let session = URLSession(configuration: .default)
+        do {
+            let (bytes, _) = try await session.bytes(for: request)
+            var buffer = Data()
+            var full = ""
+            var reasoningBuf = ""
+            var contentBuf = ""
+            var lastFlush = Date()
+
+            for try await byte in bytes {
+                if cancelFlag { break }
+                buffer.append(byte)
+                if byte == 0x0A {
                     let line = String(data: buffer, encoding: .utf8) ?? ""
                     buffer = Data()
                     let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)

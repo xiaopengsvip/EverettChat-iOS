@@ -103,7 +103,13 @@ final class RelayTransport: NSObject, ObservableObject {
                 }
             }
         default:
-            onMessage?(parsed.type, parsed.from, parsed.senderId, parsed.payload)
+            var payload = parsed.payload
+            if ["text", "image"].contains(parsed.type),
+               let data = payload["data"] as? String,
+               let plain = CryptoEngine.decrypt(data, passphrase: passphrase) {
+                payload["data"] = plain
+            }
+            onMessage?(parsed.type, parsed.from, parsed.senderId, payload)
         }
     }
 
@@ -162,6 +168,16 @@ final class RelayTransport: NSObject, ObservableObject {
     /// 发送文本消息
     func sendText(_ text: String, target: String) {
         sendEncrypted(type: "text", target: target, content: text)
+    }
+
+    /// 发送图片消息，data 字段保持端到端加密
+    func sendImage(base64: String, target: String, name: String = "image.jpg", mime: String = "image/jpeg", text: String = "") {
+        guard let enc = CryptoEngine.encrypt(base64, passphrase: passphrase) else { return }
+        sendRaw(
+            type: "image",
+            target: target,
+            payload: ["data": enc, "name": name, "mime": mime, "text": text, "target": target]
+        )
     }
 
     /// 查询在线用户

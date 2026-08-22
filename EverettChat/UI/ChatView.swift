@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import PhotosUI
 
 /// 聊天页（AI / 对端，Document Style + 思考折叠 + 模型选择）
 struct ChatView: View {
@@ -12,6 +13,7 @@ struct ChatView: View {
     @State private var messages: [ChatMessage] = []
     @State private var scrollProxy: ScrollViewProxy?
     @State private var showInfoSheet = false
+    @State private var pickerItem: PhotosPickerItem?
 
     private var isAI: Bool { appState.chatMode == "ai" }
     private let apiClient = ChatApiClient()
@@ -139,13 +141,33 @@ struct ChatView: View {
                 }
 
                 HStack(spacing: Spacing.sm) {
-                    Button {
-                        // 附件
-                    } label: {
-                        Image(systemName: "plus")
+                    PhotosPicker(selection: $pickerItem, matching: .images) {
+                        Image(systemName: "photo")
                             .font(.system(size: 18))
                             .foregroundColor(Theme.textSecondary)
                             .frame(width: 40, height: 40)
+                    }
+                    .onChange(of: pickerItem) { item in
+                        guard let item else { return }
+                        Task {
+                            if let data = try? await item.loadTransferable(type: Data.self),
+                               let img = UIImage(data: data) {
+                                let resized = img.resized(maxSide: 1280)
+                                let jpeg = resized.jpegData(compressionQuality: 0.8) ?? data
+                                let b64 = jpeg.base64EncodedString()
+                                if isAI {
+                                    // AI 发送图片
+                                    let msg = ChatMessage(role: "user", text: "", imageBase64: b64)
+                                    messages.append(msg)
+                                    sendAI(text: "", imageBase64: b64)
+                                } else {
+                                    appState.transport.sendImage(base64: b64, target: appState.chatPeerId)
+                                    let msg = ChatMessage(role: "user", text: "", imageBase64: b64, senderName: DeviceIdentity.shared.deviceName)
+                                    messages.append(msg)
+                                }
+                            }
+                            pickerItem = nil
+                        }
                     }
                     TextField(isAI ? "向 AI 提问..." : "加密消息给 \(appState.chatPeerName)...", text: $input)
                         .textFieldStyle(.plain)
@@ -220,9 +242,40 @@ struct ChatView: View {
                 onDelta: { delta, isReasoning in
                     Task { @MainActor in
                         if isReasoning {
-                            // 思考过程（暂不显示在气泡，折叠用）
                         } else {
-                            // 流式追加
+                            if let last = messages.last, last.role == "ai" {
+                                messages[messages.count - 1] = ChatMessage(
+                                    id: last.id, role: "ai", text: last.text + delta,
+                                    reasoning: last.reasoning
+                                )
+                            } else {
+                                messages.append(ChatMessage(role: "ai", text: delta))
+                            }
+                        }
+                    }
+                }
+            )
+            isStreaming = false
+            if result == nil || result?.isEmpty == true {
+                messages.append(ChatMessage(role: "ai", text: "（无回复）", isError: true))
+            }
+        }
+    }
+
+    /// 发送图片给 AI（vision 模型）
+    private func sendAI(text: String, imageBase64: String) {
+        isStreaming = true
+        let history = messages.dropLast().map { (role: $0.role == "user" ? "user" : "assistant", content: $0.text) }
+        Task {
+            let result = await apiClient.sendImageMessage(
+                history: history,
+                userMessage: text,
+                imageBase64: imageBase64,
+                model: ApiConfig.visionModel,
+                onDelta: { delta, isReasoning in
+                    Task { @MainActor in
+                        if isReasoning {
+                        } else {
                             if let last = messages.last, last.role == "ai" {
                                 messages[messages.count - 1] = ChatMessage(
                                     id: last.id, role: "ai", text: last.text + delta,
@@ -295,10 +348,19 @@ struct MessageBubble: View {
                                 .font(.caption2)
                                 .foregroundColor(Theme.textTertiary)
                         }
-                        Text(msg.text)
-                            .font(.body)
-                            .foregroundColor(Theme.textPrimary)
-                            .textSelection(.enabled)
+                        if !msg.imageBase64.isEmpty, let data = Data(base64Encoded: msg.imageBase64), let ui = UIImage(data: data) {
+                            Image(uiImage: ui)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: 240)
+                                .cornerRadius(12)
+                        }
+                        if !msg.text.isEmpty {
+                            Text(msg.text)
+                                .font(.body)
+                                .foregroundColor(Theme.textPrimary)
+                                .textSelection(.enabled)
+                        }
                     }
                     .padding(10)
                     .frame(maxWidth: 320, alignment: .leading)
@@ -307,16 +369,27 @@ struct MessageBubble: View {
                             .fill(Theme.bubbleAi)
                     )
                 } else {
-                    Text(msg.text)
-                        .font(.body)
-                        .foregroundColor(isMine ? .white : Theme.textPrimary)
-                        .padding(.horizontal, 12)
-                        .padding(.vertical, 8)
-                        .background(
-                            RoundedRectangle(cornerRadius: 16)
-                                .fill(isMine ? Theme.bubbleMine : Theme.bubblePeer)
-                        )
-                        .textSelection(.enabled)
+                    VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
+                        if !msg.imageBase64.isEmpty, let data = Data(base64Encoded: msg.imageBase64), let ui = UIImage(data: data) {
+                            Image(uiImage: ui)
+                                .resizable()
+                                .scaledToFit()
+                                .frame(maxWidth: 240)
+                                .cornerRadius(12)
+                        }
+                        if !msg.text.isEmpty {
+                            Text(msg.text)
+                                .font(.body)
+                                .foregroundColor(isMine ? .white : Theme.textPrimary)
+                                .textSelection(.enabled)
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 16)
+                            .fill(isMine ? Theme.bubbleMine : Theme.bubblePeer)
+                    )
                 }
             }
             .frame(maxWidth: .infinity, alignment: isMine ? .trailing : .leading)
@@ -441,5 +514,17 @@ struct InfoRow: View {
                 .foregroundColor(Theme.textTertiary)
         }
         .padding(Spacing.lg)
+    }
+}
+
+// MARK: - UIImage 压缩扩展
+extension UIImage {
+    func resized(maxSide: CGFloat) -> UIImage {
+        let scale = min(maxSide / size.width, maxSide / size.height, 1.0)
+        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
+        let renderer = UIGraphicsImageRenderer(size: newSize)
+        return renderer.image { _ in
+            self.draw(in: CGRect(origin: .zero, size: newSize))
+        }
     }
 }

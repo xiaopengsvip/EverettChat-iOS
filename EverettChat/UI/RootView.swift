@@ -53,18 +53,17 @@ struct MainTabView: View {
     @State private var showAddSheet = false
 
     var body: some View {
-        ZStack(alignment: .bottom) {
-            Group {
-                switch appState.selectedTab {
-                case .messages: MessagesView(showAddSheet: $showAddSheet)
-                case .contacts: ContactsView()
-                case .discover: DiscoverView()
-                case .mine: SettingsView()
-                }
+        Group {
+            switch appState.selectedTab {
+            case .messages: MessagesView(showAddSheet: $showAddSheet)
+            case .contacts: ContactsView()
+            case .discover: DiscoverView()
+            case .mine: SettingsView()
             }
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
-
-            // Floating Tab Bar
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        // Floating Tab Bar：safeAreaInset 让悬浮栏贴住 Home Indicator 安全区上沿（17 Pro Max 适配）
+        .safeAreaInset(edge: .bottom, spacing: 0) {
             FloatingTabBar(selected: $appState.selectedTab)
         }
         // 添加好友 Bottom Sheet

@@ -6,21 +6,40 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     let id: String
     var role: String          // user | ai | peer
     var text: String
+    var imageBase64: String = ""
     var reasoning: String = ""
     var senderName: String = ""
     var senderId: String = ""
     var isError: Bool = false
     var createdAt: Date = Date()
 
-    init(id: String = UUID().uuidString, role: String, text: String, reasoning: String = "",
+    init(id: String = UUID().uuidString, role: String, text: String, imageBase64: String = "", reasoning: String = "",
          senderName: String = "", senderId: String = "", isError: Bool = false) {
         self.id = id
         self.role = role
         self.text = text
+        self.imageBase64 = imageBase64
         self.reasoning = reasoning
         self.senderName = senderName
         self.senderId = senderId
         self.isError = isError
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, role, text, imageBase64, reasoning, senderName, senderId, isError, createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(String.self, forKey: .id)
+        role = try container.decode(String.self, forKey: .role)
+        text = try container.decode(String.self, forKey: .text)
+        imageBase64 = try container.decodeIfPresent(String.self, forKey: .imageBase64) ?? ""
+        reasoning = try container.decodeIfPresent(String.self, forKey: .reasoning) ?? ""
+        senderName = try container.decodeIfPresent(String.self, forKey: .senderName) ?? ""
+        senderId = try container.decodeIfPresent(String.self, forKey: .senderId) ?? ""
+        isError = try container.decodeIfPresent(Bool.self, forKey: .isError) ?? false
+        createdAt = try container.decodeIfPresent(Date.self, forKey: .createdAt) ?? Date()
     }
 }
 
