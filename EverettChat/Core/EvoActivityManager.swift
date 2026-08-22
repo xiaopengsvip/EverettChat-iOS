@@ -54,7 +54,7 @@ class EvoActivityManager {
             isFinished: true
         )
         Task {
-            await activity.end(using: state, dismissalPolicy: .after(Duration.seconds(4)))
+            await activity.end(using: state, dismissalPolicy: .after(Date.now.addingTimeInterval(4)))
             self.activity = nil
         }
     }
