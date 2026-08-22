@@ -1,37 +1,32 @@
-name: Build iOS
+name: iOS Build Xcode 27
 
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
+  push:
+    branches:
+      - main
 
 jobs:
   build:
-    runs-on: macos-27
+    runs-on: xcode-27
     timeout-minutes: 60
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode 27 beta 5 (fallback newest)
+      - name: Check Xcode Version
         run: |
-          echo "=== 已安装 Xcode ==="
-          ls /Applications | grep -i xcode
-          echo "=== 选择 Xcode 27 beta ==="
-          XCODE_PATH=""
-          for p in /Applications/Xcode_27_beta.app /Applications/Xcode_27*.app /Applications/Xcode_26*.app /Applications/Xcode.app; do
-            if [ -d "$p" ]; then XCODE_PATH="$p"; break; fi
-          done
-          if [ -z "$XCODE_PATH" ]; then
-            echo "ERROR: 未找到 Xcode"
-            exit 1
-          fi
-          echo "XCODE_PATH=$XCODE_PATH" >> $GITHUB_ENV
-          sudo xcode-select -s "$XCODE_PATH"
+          echo "=== 系统版本 ==="
+          sw_vers
+          echo "=== Xcode 版本 ==="
           xcodebuild -version
+          echo "=== 可用 SDK ==="
+          xcodebuild -showsdks
+          echo "=== 实际使用 Xcode ==="
+          xcode-select -p
 
-      - name: Install XcodeGen (latest for Xcode 27)
+      - name: Install XcodeGen (project.yml 项目，需要生成 .xcodeproj)
         run: |
           brew install xcodegen || brew upgrade xcodegen
           xcodegen --version
