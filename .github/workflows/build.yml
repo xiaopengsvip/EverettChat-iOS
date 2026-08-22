@@ -7,17 +7,29 @@ on:
 
 jobs:
   build:
-    runs-on: macos-14
+    runs-on: macos-26
     timeout-minutes: 60
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Environment info
+      - name: Select Xcode 27 beta 5 (fallback newest)
         run: |
+          echo "=== 已安装 Xcode ==="
+          ls /Applications | grep -i xcode
+          echo "=== 选择 Xcode 27 beta ==="
+          XCODE_PATH=""
+          for p in /Applications/Xcode_27_beta.app /Applications/Xcode_27*.app /Applications/Xcode_26*.app /Applications/Xcode.app; do
+            if [ -d "$p" ]; then XCODE_PATH="$p"; break; fi
+          done
+          if [ -z "$XCODE_PATH" ]; then
+            echo "ERROR: 未找到 Xcode"
+            exit 1
+          fi
+          echo "XCODE_PATH=$XCODE_PATH" >> $GITHUB_ENV
+          sudo xcode-select -s "$XCODE_PATH"
           xcodebuild -version
-          which xcodegen || echo "xcodegen NOT found"
 
       - name: Install XcodeGen (pinned 2.42.0 for Xcode 15 compat)
         run: |
