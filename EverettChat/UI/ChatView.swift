@@ -1124,3 +1124,117 @@ struct EmojiPanel: View {
         .padding(.bottom, Spacing.sm)
     }
 }
+
+/// 消息列表（ScrollView + 气泡 + contextMenu + 自动滚动）
+struct MessageListView: View {
+    let messages: [ChatMessage]
+    let isAI: Bool
+    let isStreaming: Bool
+    let streamContent: String
+    let streamReasoning: String
+    let deviceName: String
+    let playingVoiceId: String?
+    let onPlayVoice: (ChatMessage) -> Void
+    let onStopVoice: () -> Void
+    let onCopy: (ChatMessage) -> Void
+    let onRegenerate: (ChatMessage) -> Void
+    let onDelete: (ChatMessage) -> Void
+    let onCountChange: (ScrollViewProxy) -> Void
+    let onStreamChange: (ScrollViewProxy) -> Void
+
+    var body: some View {
+        ScrollViewReader { proxy in
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    Text(isAI ? "🤖 与 AI 助手对话 · 经云端中继" : "🔐 端到端加密 · 消息仅双方可见")
+                        .font(.caption2)
+                        .foregroundColor(Theme.textTertiary)
+                        .padding(.vertical, 4)
+
+                    ForEach(messages) { msg in
+                        MessageBubble(
+                            msg: msg,
+                            isMine: msg.role == "user",
+                            isAI: msg.role == "ai",
+                            deviceName: deviceName,
+                            playingVoiceId: playingVoiceId,
+                            onPlayVoice: onPlayVoice,
+                            onStopVoice: onStopVoice
+                        )
+                        .id(msg.id)
+                        .contextMenu {
+                            Button {
+                                onCopy(msg)
+                            } label: {
+                                Label("复制", systemImage: "doc.on.doc")
+                            }
+
+                            if isAI && msg.role == "ai" {
+                                Button {
+                                    onRegenerate(msg)
+                                } label: {
+                                    Label("重新生成", systemImage: "arrow.clockwise")
+                                }
+                                .disabled(isStreaming)
+                            }
+
+                            Button(role: .destructive) {
+                                onDelete(msg)
+                            } label: {
+                                Label("删除", systemImage: "trash")
+                            }
+                        }
+                    }
+                    if isStreaming {
+                        MessageBubble(
+                            msg: ChatMessage(role: "ai", text: streamContent, reasoning: streamReasoning),
+                            isMine: false, isAI: true, deviceName: deviceName,
+                            playingVoiceId: nil,
+                            onPlayVoice: { _ in },
+                            onStopVoice: {}
+                        )
+                        .id("streaming")
+                    }
+                }
+                .padding(.horizontal, Spacing.md)
+                .padding(.vertical, Spacing.sm)
+            }
+            .onChange(of: messages.count) { _ in
+                onCountChange(proxy)
+            }
+            .onChange(of: streamContent) { _ in
+                onStreamChange(proxy)
+            }
+        }
+    }
+}
+
+/// AI 模型切换行
+struct ModelSwitcherRow: View {
+    let icon: String
+    let name: String
+    let onTap: () -> Void
+
+    var body: some View {
+        HStack(spacing: Spacing.sm) {
+            Button(action: onTap) {
+                HStack(spacing: 4) {
+                    Text("\(icon) \(name) ▾")
+                        .font(.caption)
+                        .foregroundColor(Theme.primary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Theme.primary.opacity(0.15))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.primary.opacity(0.35), lineWidth: 1))
+                )
+            }
+            Text("切换模型")
+                .font(.caption2)
+                .foregroundColor(Theme.textTertiary)
+            Spacer()
+        }
+    }
+}
