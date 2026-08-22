@@ -108,28 +108,11 @@ struct ChatView: View {
             // 输入区
             VStack(spacing: 0) {
                 if isAI {
-                    HStack(spacing: Spacing.sm) {
-                        Button {
-                            showModelSheet = true
-                        } label: {
-                            HStack(spacing: 4) {
-                                Text("\(currentModelIcon) \(currentModelName) ▾")
-                                    .font(.caption)
-                                    .foregroundColor(Theme.primary)
-                            }
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 6)
-                            .background(
-                                RoundedRectangle(cornerRadius: 14)
-                                    .fill(Theme.primary.opacity(0.15))
-                                    .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.primary.opacity(0.35), lineWidth: 1))
-                            )
-                        }
-                        Text("切换模型")
-                            .font(.caption2)
-                            .foregroundColor(Theme.textTertiary)
-                        Spacer()
-                    }
+                    ModelSwitcherRow(
+                        icon: currentModelIcon,
+                        name: currentModelName,
+                        onTap: { showModelSheet = true }
+                    )
                     .padding(.horizontal, Spacing.md)
                     .padding(.bottom, 4)
                 }
@@ -964,6 +947,36 @@ struct MessageListView: View {
             .onChange(of: streamContent) { _ in
                 onStreamChange(proxy)
             }
+        }
+    }
+}
+
+/// AI 模型切换行
+struct ModelSwitcherRow: View {
+    let icon: String
+    let name: String
+    let onTap: () -> Void
+
+    var body: some View {
+        HStack(spacing: Spacing.sm) {
+            Button(action: onTap) {
+                HStack(spacing: 4) {
+                    Text("\(icon) \(name) ▾")
+                        .font(.caption)
+                        .foregroundColor(Theme.primary)
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .background(
+                    RoundedRectangle(cornerRadius: 14)
+                        .fill(Theme.primary.opacity(0.15))
+                        .overlay(RoundedRectangle(cornerRadius: 14).stroke(Theme.primary.opacity(0.35), lineWidth: 1))
+                )
+            }
+            Text("切换模型")
+                .font(.caption2)
+                .foregroundColor(Theme.textTertiary)
+            Spacer()
         }
     }
 }
