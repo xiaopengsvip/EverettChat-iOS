@@ -27,6 +27,8 @@ struct RootView: View {
                 FriendRequestDialog(request: req)
             }
         }
+        // 主题切换时强制重建整棵视图树（实时响应，不残留旧色）
+        .id(themeVersion)
         .animation(.easeInOut(duration: 0.2), value: appState.showChat)
         .onAppear {
             applyTheme()
@@ -101,25 +103,9 @@ struct FloatingTabBar: View {
             }
         }
         .padding(.vertical, 10)
-        // 原生 Liquid Glass：iOS 26+ 用系统 glassEffect，低版本回退 ultraThinMaterial
+        // 原生 Liquid Glass：iOS 26+ 系统 glassEffect，低版本 ultraThinMaterial
         .background {
-            if #available(iOS 26.0, *) {
-                RoundedRectangle(cornerRadius: Radius.floating, style: .continuous)
-                    .glassEffect(.regular)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radius.floating, style: .continuous)
-                            .stroke(Theme.outline, lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.25), radius: 16, y: 4)
-            } else {
-                RoundedRectangle(cornerRadius: Radius.floating, style: .continuous)
-                    .fill(.ultraThinMaterial)
-                    .overlay(
-                        RoundedRectangle(cornerRadius: Radius.floating, style: .continuous)
-                            .stroke(Theme.outline, lineWidth: 1)
-                    )
-                    .shadow(color: .black.opacity(0.25), radius: 16, y: 4)
-            }
+            GlassSurface(cornerRadius: Radius.floating)
         }
         .padding(.horizontal, Spacing.lg)
         .padding(.bottom, Spacing.sm)
@@ -130,6 +116,8 @@ struct FloatingTabBar: View {
 struct AddFriendSheet: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
+    @State private var showScanner = false
+    @State private var showMyQr = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -138,11 +126,7 @@ struct AddFriendSheet: View {
                 .padding(Spacing.xl)
 
             Button {
-                dismiss()
-                // 延迟触发外层 sheet，避免与 dismiss 同时呈现冲突（"拉回去"问题）
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    appState.showQrScanner = true
-                }
+                showScanner = true
             } label: {
                 Label("扫一扫", systemImage: "qrcode.viewfinder")
                     .font(.body)
@@ -154,10 +138,7 @@ struct AddFriendSheet: View {
             Divider().padding(.leading, Spacing.xl)
 
             Button {
-                dismiss()
-                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-                    appState.showMyQr = true
-                }
+                showMyQr = true
             } label: {
                 Label("我的二维码", systemImage: "qrcode")
                     .font(.body)
@@ -169,6 +150,13 @@ struct AddFriendSheet: View {
         }
         .background(Theme.surface)
         .presentationDetents([.height(200)])
+        // 在当前页面直接全屏打开扫一扫/二维码（不跳转其他页面）
+        .fullScreenCover(isPresented: $showScanner) {
+            QrScannerView()
+        }
+        .fullScreenCover(isPresented: $showMyQr) {
+            MyQrCodeView()
+        }
     }
 }
 

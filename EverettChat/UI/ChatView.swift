@@ -24,6 +24,19 @@ struct ChatView: View {
     @State private var showInfoSheet = false
     @State private var pickerItem: PhotosPickerItem?
     @State private var webURL: URL?
+    // +号功能面板
+    @State private var showPlusPanel = false
+    // 相册
+    @State private var showPhotoPicker = false
+    // 文件发送
+    @State private var showFilePicker = false
+    // 拍摄
+    @State private var showCamera = false
+    @State private var cameraImage: UIImage?
+    // 语音按住录音：上滑取消
+    @State private var isVoiceSlidingUp = false
+    @State private var voiceDragOffset: CGFloat = 0
+    @State private var voiceHintText = ""
 
     private var isAI: Bool { appState.chatMode == "ai" }
     private let apiClient = ChatApiClient()
@@ -63,7 +76,7 @@ struct ChatView: View {
                 }
             }
             .padding(.horizontal, Spacing.md)
-            .padding(.vertical, Spacing.sm)
+            .padding(.vertical, Spacing.md)
             // 顶栏与内容区分：原生材质背景 + 底部细分隔线
             .background(.thinMaterial)
             .overlay(alignment: .bottom) {
@@ -166,53 +179,16 @@ struct ChatView: View {
                 }
 
                 HStack(spacing: Spacing.sm) {
-                    PhotosPicker(selection: $pickerItem, matching: .images) {
-                        Image(systemName: "photo")
-                            .font(.system(size: 18))
+                    // + 号按钮 → 功能模块面板（相册/文件/拍摄/语音电话/视频电话/个人名片）
+                    Button {
+                        showPlusPanel = true
+                    } label: {
+                        Image(systemName: "plus.circle.fill")
+                            .font(.system(size: 22))
                             .foregroundColor(Theme.textSecondary)
                             .frame(width: 40, height: 40)
                     }
-                    .onChange(of: pickerItem) { item in
-                        guard let item else { return }
-                        Task {
-                            if let data = try? await item.loadTransferable(type: Data.self),
-                               let img = UIImage(data: data) {
-                                let resized = img.resized(maxSide: 1280)
-                                let jpeg = resized.jpegData(compressionQuality: 0.8) ?? data
-                                let b64 = jpeg.base64EncodedString()
-                                if isAI {
-                                    // AI 发送图片
-                                    let msg = ChatMessage(role: "user", text: "", imageBase64: b64)
-                                    messages.append(msg)
-                                    sendAI(text: "", imageBase64: b64)
-                                } else {
-                                    let msg = ChatMessage(role: "user", text: "", imageBase64: b64, senderName: DeviceIdentity.shared.deviceName)
-                                    messages.append(msg)
-                                    appState.transport.sendImage(base64: b64, target: appState.chatPeerId, messageId: msg.id)
-                                }
-                            }
-                            pickerItem = nil
-                        }
-                    }
-                    // 语音按钮（点击开始/停止录音）
-                    Button {
-                        if isRecording {
-                            stopRecordingAndSend()
-                        } else {
-                            startRecording()
-                        }
-                    } label: {
-                        Image(systemName: isRecording ? "stop.circle.fill" : "mic")
-                            .font(.system(size: 18))
-                            .foregroundColor(isRecording ? Theme.error : Theme.textSecondary)
-                            .frame(width: 40, height: 40)
-                    }
-                    if isRecording {
-                        Text(String(format: "%.0f\"", recordingSeconds))
-                            .font(.caption)
-                            .foregroundColor(Theme.error)
-                            .monospacedDigit()
-                    }
+
                     TextField(isAI ? "向 AI 提问..." : "加密消息给 \(appState.chatPeerName)...", text: $input)
                         .textFieldStyle(.plain)
                         .font(.body)
@@ -221,16 +197,58 @@ struct ChatView: View {
                         .background(RoundedRectangle(cornerRadius: 20).fill(Theme.surfaceHigh))
                         .submitLabel(.send)
                         .onSubmit { send() }
-                    Button {
-                        send()
-                    } label: {
-                        Image(systemName: "paperplane.fill")
-                            .font(.system(size: 18))
-                            .foregroundColor(.white)
-                            .frame(width: 44, height: 44)
-                            .background(Circle().fill(input.isEmpty ? Theme.surfaceAlt : Theme.primary))
+
+                    // 右侧：无文字时按住录音，有文字时发送
+                    if input.isEmpty {
+                        // 按住录音，松开发送，上滑取消
+                        ZStack {
+                            if isRecording {
+                                Text(isVoiceSlidingUp ? "⬆️ 松开取消" : String(format: "%.0f\"", recordingSeconds))
+                                    .font(.caption)
+                                    .foregroundColor(isVoiceSlidingUp ? Theme.error : Theme.textSecondary)
+                                    .offset(y: -36)
+                                    .transition(.scale.combined(with: .opacity))
+                            }
+                            Image(systemName: isRecording ? "waveform" : "mic.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(isRecording ? (isVoiceSlidingUp ? Theme.error : Theme.primary) : Theme.textSecondary)
+                                .frame(width: 44, height: 44)
+                                .background(
+                                    Circle().fill(isRecording ? (isVoiceSlidingUp ? Theme.error.opacity(0.15) : Theme.primary.opacity(0.15)) : .clear)
+                                )
+                                .gesture(
+                                    DragGesture(minimumDistance: 0)
+                                        .onChanged { value in
+                                            if !isRecording {
+                                                startRecording()
+                                            }
+                                            isVoiceSlidingUp = value.translation.height < -60
+                                            voiceDragOffset = value.translation.height
+                                        }
+                                        .onEnded { value in
+                                            if isVoiceSlidingUp {
+                                                // 上滑取消
+                                                cancelRecording()
+                                            } else {
+                                                // 松开发送
+                                                stopRecordingAndSend()
+                                            }
+                                            isVoiceSlidingUp = false
+                                            voiceDragOffset = 0
+                                        }
+                                )
+                        }
+                    } else {
+                        Button {
+                            send()
+                        } label: {
+                            Image(systemName: "paperplane.fill")
+                                .font(.system(size: 18))
+                                .foregroundColor(.white)
+                                .frame(width: 44, height: 44)
+                                .background(Circle().fill(Theme.primary))
+                        }
                     }
-                    .disabled(input.isEmpty)
                 }
                 .padding(.horizontal, Spacing.md)
                 .padding(.vertical, Spacing.sm)
@@ -239,8 +257,78 @@ struct ChatView: View {
             .background(.thinMaterial)
         }
         .background(Theme.bg)
+        // 语音提示浮层（录音提示/功能提示）
+        .overlay(alignment: .top) {
+            if showVoiceHint {
+                Text(voiceHintText.isEmpty ? (isRecording ? "正在录音..." : "按住说话") : voiceHintText)
+                    .font(.caption)
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 8)
+                    .background(Capsule().fill(Color.black.opacity(0.7)))
+                    .padding(.top, 8)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: showVoiceHint)
+        // +号模块面板
+        .confirmationDialog("功能", isPresented: $showPlusPanel, titleVisibility: .visible) {
+            Button("📷 相册") { showPhotoPicker = true }
+            Button("📁 文件") { showFilePicker = true }
+            Button("📸 拍摄") { showCamera = true }
+            Button("📞 语音电话") { voiceHintText = "语音电话即将上线"; showVoiceHint = true }
+            Button("📹 视频电话") { voiceHintText = "视频电话即将上线"; showVoiceHint = true }
+            Button("👤 个人名片") {
+                let card = "我的 ID: \(DeviceIdentity.shared.shortId) · 昵称: \(DeviceIdentity.shared.deviceName)"
+                if isAI {
+                    let msg = ChatMessage(role: "user", text: card)
+                    messages.append(msg)
+                    sendAI(text: card)
+                } else {
+                    let msg = ChatMessage(role: "user", text: card, senderId: appState.chatPeerId)
+                    messages.append(msg)
+                    appState.transport.sendText(card, target: appState.chatPeerId, messageId: msg.id)
+                }
+            }
+            Button("取消", role: .cancel) {}
+        }
         .sheet(isPresented: $showModelSheet) { ModelPickerSheet(selected: $selectedModel) }
         .sheet(isPresented: $showInfoSheet) { ChatInfoSheet(isAI: isAI) }
+        // 文件选择器
+        .sheet(isPresented: $showFilePicker) {
+            DocumentPicker { _, fileName, data in
+                sendFile(name: fileName, data: data)
+            }
+        }
+        // 相机拍摄
+        .fullScreenCover(isPresented: $showCamera) {
+            CameraPicker { image in
+                sendCameraImage(image)
+            }
+        }
+        // 相册（PhotosPicker 展示）
+        .photosPicker(isPresented: $showPhotoPicker, selection: $pickerItem, matching: .images)
+        .onChange(of: pickerItem) { item in
+            guard let item else { return }
+            Task {
+                if let data = try? await item.loadTransferable(type: Data.self),
+                   let img = UIImage(data: data) {
+                    let resized = img.resized(maxSide: 1280)
+                    let jpeg = resized.jpegData(compressionQuality: 0.8) ?? data
+                    let b64 = jpeg.base64EncodedString()
+                    if isAI {
+                        let msg = ChatMessage(role: "user", text: "", imageBase64: b64)
+                        messages.append(msg)
+                        sendAI(text: "", imageBase64: b64)
+                    } else {
+                        let msg = ChatMessage(role: "user", text: "", imageBase64: b64, senderName: DeviceIdentity.shared.deviceName)
+                        messages.append(msg)
+                        appState.transport.sendImage(base64: b64, target: appState.chatPeerId, messageId: msg.id)
+                    }
+                }
+                pickerItem = nil
+            }
+        }
         // 消息内链接 → 应用内浏览器（不跳出 Safari）
         .environment(\.openURL, OpenURLAction { url in
             webURL = url
@@ -434,12 +522,28 @@ struct ChatView: View {
         rec.stop()
         isRecording = false
         let url = rec.url
-        guard let data = try? Data(contentsOf: url), duration > 0.5 else { return }
+        guard let data = try? Data(contentsOf: url), duration > 0.5 else {
+            try? FileManager.default.removeItem(at: url)
+            return
+        }
         let b64 = data.base64EncodedString()
         let msg = ChatMessage(role: "user", text: "", voiceBase64: b64, voiceDurationMs: duration * 1000, senderName: DeviceIdentity.shared.deviceName)
         messages.append(msg)
         appState.transport.sendVoice(base64: b64, target: appState.chatPeerId, durationMs: duration * 1000, messageId: msg.id)
         try? FileManager.default.removeItem(at: url)
+    }
+
+    /// 上滑取消录音（丢弃）
+    private func cancelRecording() {
+        recordTimer?.invalidate()
+        recordTimer = nil
+        guard let rec = recorder else {
+            isRecording = false
+            return
+        }
+        rec.stop()
+        isRecording = false
+        try? FileManager.default.removeItem(at: rec.url)
     }
 
     private func playVoice(_ msg: ChatMessage) {
@@ -461,6 +565,38 @@ struct ChatView: View {
         voicePlayer?.stop()
         voicePlayer = nil
         playingVoiceId = nil
+    }
+
+    /// 发送文件（Base64 传输，带文件名）
+    private func sendFile(name: String, data: Data) {
+        let b64 = data.base64EncodedString()
+        let text = "[文件] \(name)"
+        if isAI {
+            let msg = ChatMessage(role: "user", text: text)
+            messages.append(msg)
+            sendAI(text: text)
+        } else {
+            let msg = ChatMessage(role: "user", text: text, senderName: DeviceIdentity.shared.deviceName)
+            messages.append(msg)
+            // 文件走图片通道？（relay 无 file 类型）——用文本通道发文件名 + data 标记
+            appState.transport.sendText("[file]\(name)::\(b64)", target: appState.chatPeerId, messageId: msg.id)
+        }
+    }
+
+    /// 发送拍摄的照片
+    private func sendCameraImage(_ image: UIImage) {
+        let resized = image.resized(maxSide: 1280)
+        let jpeg = resized.jpegData(compressionQuality: 0.8) ?? Data()
+        let b64 = jpeg.base64EncodedString()
+        if isAI {
+            let msg = ChatMessage(role: "user", text: "", imageBase64: b64)
+            messages.append(msg)
+            sendAI(text: "", imageBase64: b64)
+        } else {
+            let msg = ChatMessage(role: "user", text: "", imageBase64: b64, senderName: DeviceIdentity.shared.deviceName)
+            messages.append(msg)
+            appState.transport.sendImage(base64: b64, target: appState.chatPeerId, messageId: msg.id)
+        }
     }
 
     private func regenerateAIResponse(for message: ChatMessage) {

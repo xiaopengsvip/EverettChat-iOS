@@ -9,6 +9,7 @@ struct SettingsView: View {
     @State private var showRestore = false
     @State private var restoreInput = ""
     @State private var restoreResult: String? = nil
+    @State private var showMyQr = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -42,7 +43,7 @@ struct SettingsView: View {
                         Spacer()
                         // 二维码按钮：点击查看我的二维码
                         Button {
-                            appState.showMyQr = true
+                            showMyQr = true
                         } label: {
                             Image(systemName: "qrcode")
                                 .font(.system(size: 20))
@@ -118,6 +119,10 @@ struct SettingsView: View {
             }
         }
         .background(Theme.bg)
+        // 我的二维码：当前页面直接全屏打开（不跳转）
+        .fullScreenCover(isPresented: $showMyQr) {
+            MyQrCodeView()
+        }
         // 恢复密钥展示
         .alert("恢复密钥", isPresented: $showRecoveryKey) {
             Button("复制") {

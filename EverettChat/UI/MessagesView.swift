@@ -36,27 +36,8 @@ struct MessagesView: View {
 
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    // 消息搜索框（液态玻璃材质）
-                    HStack {
-                        Image(systemName: "magnifyingglass").foregroundColor(Theme.textTertiary)
-                        TextField("搜索消息", text: $searchQuery)
-                            .font(.body)
-                        if !searchQuery.isEmpty {
-                            Button { searchQuery = "" } label: { Image(systemName: "xmark.circle.fill").foregroundColor(Theme.textTertiary) }
-                        }
-                    }
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.vertical, 10)
-                    .background(
-                        RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
-                            .fill(.thinMaterial)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Radius.medium, style: .continuous)
-                                    .stroke(Theme.outline, lineWidth: 1)
-                            )
-                    )
-                    .padding(.horizontal, Spacing.lg)
-                    .padding(.vertical, Spacing.sm)
+                    // 消息搜索框（原生液态玻璃）
+                    GlassSearchBar(text: $searchQuery, placeholder: "搜索消息")
 
                     // AI 助手固定置顶
                     ConversationRow(
