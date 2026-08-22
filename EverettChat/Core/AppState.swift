@@ -43,6 +43,32 @@ final class AppState: ObservableObject {
     private var cancellables = Set<AnyCancellable>()
 
     func start() {
+        transport.onMessage = { [weak self] type, from, senderId, payload in
+            guard let self else { return }
+            switch type {
+            case "friend-request":
+                let name = (payload["name"] as? String) ?? from
+                let requestSenderId = payload["senderId"] as? String ?? senderId
+                self.pendingFriendRequest = (id: requestSenderId, name: name)
+            case "text":
+                guard let text = payload["data"] as? String else { return }
+                let message = ChatMessage(role: "peer", text: text, senderName: from, senderId: senderId)
+                let now = message.createdAt
+                self.peerMessages.append(message)
+
+                if let index = self.conversations.firstIndex(where: { $0.id == senderId }) {
+                    self.conversations[index].name = from
+                    self.conversations[index].lastText = text
+                    self.conversations[index].lastTime = now
+                } else {
+                    self.conversations.append(
+                        Conversation(id: senderId, name: from, type: "peer", lastText: text, lastTime: now)
+                    )
+                }
+            default:
+                break
+            }
+        }
         // 启动自动连接中继
         transport.connect()
         // 监听在线用户
