@@ -371,7 +371,7 @@ struct ChatView: View {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { showVoiceHint = false }
             return
         }
-        AVAudioApplication.requestRecordPermission { granted in
+        AVAudioSession.sharedInstance().requestRecordPermission { granted in
             guard granted else {
                 showVoiceHint = true
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2) { showVoiceHint = false }

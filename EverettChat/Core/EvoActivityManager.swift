@@ -20,18 +20,10 @@ class EvoActivityManager {
         let attributes = EvoActivityAttributes(sessionId: sessionId, peerName: peerName)
         let state = EvoActivityAttributes.ContentState(status: "等待中", progress: 0)
         do {
-            if #available(iOS 16.2, *) {
-                activity = try Activity.request(
-                    attributes: attributes,
-                    content: .init(state: state, staleDate: nil)
-                )
-            } else {
-                activity = try Activity.request(
-                    attributes: attributes,
-                    content: .init(state: state, staleDate: nil),
-                    staleDate: nil
-                )
-            }
+            activity = try Activity.request(
+                attributes: attributes,
+                content: .init(state: state, staleDate: nil)
+            )
         } catch {
             activity = nil
         }
@@ -62,11 +54,7 @@ class EvoActivityManager {
             isFinished: true
         )
         Task {
-            if #available(iOS 16.2, *) {
-                await activity.end(using: state, dismissalPolicy: .after(Duration.seconds(4)))
-            } else {
-                await activity.end(using: state, dismissalPolicy: .after(Date.now.addingTimeInterval(4)))
-            }
+            await activity.end(using: state, dismissalPolicy: .after(Duration.seconds(4)))
             self.activity = nil
         }
     }
