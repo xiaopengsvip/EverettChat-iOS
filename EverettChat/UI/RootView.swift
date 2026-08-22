@@ -103,15 +103,16 @@ struct FloatingTabBar: View {
             }
         }
         .padding(.vertical, 10)
-        .background(
-            RoundedRectangle(cornerRadius: Radius.floating)
-                .fill(Theme.glass)
+        // 原生 Liquid Glass：系统毛玻璃（iOS 18+/27 自动适配珍珠白/深邃黑）
+        .background {
+            RoundedRectangle(cornerRadius: Radius.floating, style: .continuous)
+                .fill(.ultraThinMaterial)
                 .overlay(
-                    RoundedRectangle(cornerRadius: Radius.floating)
+                    RoundedRectangle(cornerRadius: Radius.floating, style: .continuous)
                         .stroke(Theme.outline, lineWidth: 1)
                 )
-                .shadow(color: .black.opacity(0.3), radius: 16, y: 4)
-        )
+                .shadow(color: .black.opacity(0.25), radius: 16, y: 4)
+        }
         .padding(.horizontal, Spacing.lg)
         .padding(.bottom, Spacing.sm)
     }

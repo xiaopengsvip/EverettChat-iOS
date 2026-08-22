@@ -219,7 +219,8 @@ struct ChatView: View {
                 .padding(.horizontal, Spacing.md)
                 .padding(.vertical, Spacing.sm)
             }
-            .background(Theme.glass)
+            // 原生 Liquid Glass 输入区
+            .background(.thinMaterial)
         }
         .background(Theme.bg)
         .sheet(isPresented: $showModelSheet) { ModelPickerSheet(selected: $selectedModel) }
