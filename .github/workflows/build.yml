@@ -14,12 +14,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Select Xcode
-        run: sudo xcode-select -s /Applications/Xcode_15.4.app
-
-      - name: Install XcodeGen
+      - name: Environment info
         run: |
-          brew install xcodegen || true
+          xcodebuild -version
+          which xcodegen || echo "xcodegen NOT found"
+
+      - name: Install XcodeGen (if missing)
+        if: ${{ runner.os == 'macOS' }}
+        run: |
+          which xcodegen || brew install xcodegen
 
       - name: Generate Xcode project
         run: xcodegen generate
@@ -32,30 +35,11 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             -derivedDataPath build \
             CODE_SIGNING_ALLOWED=NO \
-            build | tail -20
-
-      - name: Build (device, ad-hoc signing if identity available)
-        if: ${{ secrets.IOS_SIGNING_IDENTITY != '' }}
-        run: |
-          xcodebuild -project EverettChat.xcodeproj \
-            -scheme EverettChat \
-            -configuration Release \
-            -destination 'generic/platform=iOS' \
-            -derivedDataPath build-device \
-            CODE_SIGN_STYLE=Manual \
-            DEVELOPMENT_TEAM=${{ secrets.IOS_DEVELOPMENT_TEAM }} \
-            CODE_SIGN_IDENTITY="${{ secrets.IOS_SIGNING_IDENTITY }}" \
-            build | tail -20
+            build 2>&1 | tail -40
 
       - name: Upload simulator build
         uses: actions/upload-artifact@v4
         with:
           name: EverettChat-simulator
           path: build/Build/Products/Debug-iphonesimulator/EverettChat.app
-
-      - name: Upload device build
-        if: ${{ secrets.IOS_SIGNING_IDENTITY != '' }}
-        uses: actions/upload-artifact@v4
-        with:
-          name: EverettChat-device
-          path: build-device/Build/Products/Release-iphoneos/EverettChat.app
+          if-no-files-found: warn
