@@ -7,13 +7,16 @@ struct ContactsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            // 顶栏（标题居中）
+            ZStack {
                 Text("通讯录")
                     .font(.title3.bold())
                     .foregroundColor(Theme.textPrimary)
-                Spacer()
-                Button { appState.showMyQr = true } label: {
-                    Image(systemName: "qrcode").font(.body).foregroundColor(Theme.textSecondary)
+                HStack {
+                    Spacer()
+                    Button { appState.showMyQr = true } label: {
+                        Image(systemName: "qrcode").font(.body).foregroundColor(Theme.textSecondary)
+                    }
                 }
             }
             .padding(.horizontal, Spacing.lg)

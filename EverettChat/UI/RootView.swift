@@ -3,8 +3,12 @@ import SwiftUI
 /// 根视图：Floating Tab Bar + 全屏页面 + 全局弹层
 struct RootView: View {
     @EnvironmentObject var appState: AppState
+    @Environment(\.colorScheme) private var colorScheme
+    @State private var themeVersion = 0
 
     var body: some View {
+        let _ = themeVersion
+
         ZStack {
             Theme.bg.ignoresSafeArea()
 
@@ -24,7 +28,19 @@ struct RootView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: appState.showChat)
-        .onAppear { appState.start() }
+        .onAppear {
+            applyTheme()
+            appState.start()
+        }
+        .onChange(of: colorScheme) { _ in
+            applyTheme()
+        }
+    }
+
+    private func applyTheme() {
+        let mode = UserDefaults.standard.string(forKey: "theme_mode") ?? "system"
+        AppTheme.apply(mode, systemDark: colorScheme == .dark)
+        themeVersion += 1
     }
 }
 

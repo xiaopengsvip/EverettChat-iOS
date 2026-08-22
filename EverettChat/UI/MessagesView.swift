@@ -7,20 +7,22 @@ struct MessagesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶栏
-            HStack {
+            // 顶栏（标题居中）
+            ZStack {
                 Text("消息")
                     .font(.title3.bold())
                     .foregroundColor(Theme.textPrimary)
-                Spacer()
-                Button {
-                    showAddSheet = true
-                } label: {
-                    Image(systemName: "plus")
-                        .font(.system(size: 18, weight: .light))
-                        .foregroundColor(Theme.textPrimary)
-                        .frame(width: 36, height: 36)
-                        .background(RoundedRectangle(cornerRadius: 10).fill(Theme.surfaceHigh))
+                HStack {
+                    Spacer()
+                    Button {
+                        showAddSheet = true
+                    } label: {
+                        Image(systemName: "plus")
+                            .font(.system(size: 18, weight: .light))
+                            .foregroundColor(Theme.textPrimary)
+                            .frame(width: 36, height: 36)
+                            .background(RoundedRectangle(cornerRadius: 10).fill(Theme.surfaceHigh))
+                    }
                 }
             }
             .padding(.horizontal, Spacing.lg)

@@ -7,11 +7,14 @@ struct DiscoverView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            HStack {
+            // 顶栏（标题居中）
+            ZStack {
                 Text("发现")
                     .font(.title3.bold())
                     .foregroundColor(Theme.textPrimary)
-                Spacer()
+                HStack {
+                    Spacer()
+                }
             }
             .padding(.horizontal, Spacing.lg)
             .padding(.vertical, Spacing.md)
