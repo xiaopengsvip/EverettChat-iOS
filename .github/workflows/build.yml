@@ -29,6 +29,12 @@ jobs:
       - name: Generate Xcode project
         run: xcodegen generate
 
+      - name: Compute version (YY.MMDD.XXXX)
+        run: |
+          BUILD=$(git rev-list --count HEAD)
+          printf 'EVO_VERSION=%.2d.%s.%04d\n' $((10#$(date +%y))) "$(date +%m%d)" $((BUILD + 1000)) >> $GITHUB_ENV
+          echo "版本: $EVO_VERSION"
+
       - name: Build (device, no signing)
         run: |
           set -o pipefail
@@ -37,6 +43,8 @@ jobs:
             -configuration Debug \
             -destination 'generic/platform=iOS' \
             -derivedDataPath build \
+            MARKETING_VERSION=$EVO_VERSION \
+            CURRENT_PROJECT_VERSION=$((10#$(date +%y)) * 100000 + $(date +%m%d)) \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
