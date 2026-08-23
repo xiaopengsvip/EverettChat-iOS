@@ -58,14 +58,15 @@ struct SettingsView: View {
                 .buttonStyle(.plain)
             }
 
-            // 外观
+            // 主题
             Section {
-                Picker("外观", selection: themeModeBinding) {
-                    Text("跟随系统").tag("system")
-                    Text("珍珠白").tag("light")
-                    Text("深邃黑").tag("dark")
+                NavigationLink {
+                    ThemeView()
+                } label: {
+                    SettingsRowLabel(icon: "paintpalette",
+                                     title: "主题",
+                                     subtitle: currentThemeName())
                 }
-                .pickerStyle(.inline)
             } header: {
                 Text("外观")
             }
@@ -259,6 +260,15 @@ struct SettingsView: View {
             get: { UserDefaults.standard.string(forKey: "theme_mode") ?? "system" },
             set: { applyThemeMode($0) }
         )
+    }
+
+    /// 当前主题名（设置页副标题显示）
+    private func currentThemeName() -> String {
+        switch UserDefaults.standard.string(forKey: "theme_mode") ?? "system" {
+        case "light": return "珍珠白"
+        case "dark": return "深邃黑"
+        default: return "跟随系统"
+        }
     }
 
     /// 测试版本号（截图可识别设备/协议/构建日期，正式版可移除）

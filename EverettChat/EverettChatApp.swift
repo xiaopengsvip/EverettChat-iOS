@@ -4,6 +4,7 @@ import UIKit
 @main
 struct EverettChatApp: App {
     @StateObject private var appState = AppState.shared
+    @AppStorage("theme_mode") private var themeMode = "system"
 
     init() {
         let mode = UserDefaults.standard.string(forKey: "theme_mode") ?? "system"
@@ -14,9 +15,14 @@ struct EverettChatApp: App {
         WindowGroup {
             RootView()
                 .environmentObject(appState)
-                .preferredColorScheme(Self.preferredColorScheme())
+                .preferredColorScheme(preferredColorScheme())   // @AppStorage 变化 → body 重算 → 实时切换
                 .onOpenURL { url in
                     handleDeepLink(url)
+                }
+                .onChange(of: themeMode) { newMode in
+                    // 实时应用主题：通知全局重绘
+                    AppTheme.apply(newMode, systemDark: UITraitCollection.current.userInterfaceStyle == .dark)
+                    NotificationCenter.default.post(name: Notification.Name("EVOThemeChanged"), object: nil)
                 }
         }
     }
@@ -41,10 +47,9 @@ struct EverettChatApp: App {
         }
     }
 
-    private static func preferredColorScheme() -> ColorScheme? {
-        let mode = UserDefaults.standard.string(forKey: "theme_mode") ?? "system"
-
-        switch mode {
+    /// 动态 preferredColorScheme（@AppStorage 变化时实时生效）
+    private func preferredColorScheme() -> ColorScheme? {
+        switch themeMode {
         case "light":
             return .light
         case "dark":

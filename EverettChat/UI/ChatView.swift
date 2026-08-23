@@ -87,8 +87,7 @@ struct ChatView: View {
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
                         .lineLimit(1)
-                    Text(isAI ? currentModelName : isDevice ? (deviceStore.modelName.isEmpty ? "已连接" : deviceStore.modelName) :
-                        (appState.onlineDeviceIds.contains(appState.chatPeerId) ? "在线 · " : "离线 · ") + "ID: \(String(appState.chatPeerId.prefix(8)))")
+                    Text(chatSubtitle)
                         .font(.caption2)
                         .foregroundColor(Theme.textTertiary)
                 }
@@ -491,6 +490,15 @@ struct ChatView: View {
     }
     private var currentModelName: String { currentModel.name }
     private var currentModelIcon: String { currentModel.vision ? "eye.fill" : "sparkles" }
+    /// 顶栏副标题（拆开避免编译器类型检查超时）
+    private var chatSubtitle: String {
+        if isAI { return currentModelName }
+        if isDevice {
+            return deviceStore.modelName.isEmpty ? "已连接" : deviceStore.modelName
+        }
+        let status = appState.onlineDeviceIds.contains(appState.chatPeerId) ? "在线 · " : "离线 · "
+        return status + "ID: \(String(appState.chatPeerId.prefix(8)))"
+    }
     private var streamContent: String { apiClient.streamText }
     private var streamReasoning: String { apiClient.reasoningText }
 
