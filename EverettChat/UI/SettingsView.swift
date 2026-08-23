@@ -49,7 +49,7 @@ struct SettingsView: View {
                         Spacer()
                         Image(systemName: "chevron.right")
                             .font(.caption)
-                            .foregroundColor(.tertiary)
+                            .foregroundColor(Color(UIColor.tertiaryLabel))
                     }
                 }
                 .buttonStyle(.plain)
@@ -223,6 +223,13 @@ struct SettingsView: View {
         if let url = URL(string: urlString) {
             webURL = url
         }
+    }
+
+    private var themeModeBinding: Binding<String> {
+        Binding(
+            get: { UserDefaults.standard.string(forKey: "theme_mode") ?? "system" },
+            set: { applyThemeMode($0) }
+        )
     }
 
     private func applyThemeMode(_ mode: String) {

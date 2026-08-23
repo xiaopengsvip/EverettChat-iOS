@@ -120,3 +120,108 @@ struct RootView: View {
         themeVersion += 1
     }
 }
+/// 添加好友 Sheet
+struct AddFriendSheet: View {
+    @EnvironmentObject var appState: AppState
+    @Environment(\.dismiss) private var dismiss
+    @State private var showScanner = false
+    @State private var showMyQr = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Text("添加好友")
+                .font(.headline)
+                .padding(Spacing.xl)
+
+            Button {
+                showScanner = true
+            } label: {
+                Label("扫一扫", systemImage: "qrcode.viewfinder")
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(Spacing.xl)
+            }
+
+            Divider().padding(.leading, Spacing.xl)
+
+            Button {
+                showMyQr = true
+            } label: {
+                Label("我的二维码", systemImage: "qrcode")
+                    .font(.body)
+                    .foregroundColor(.primary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(Spacing.xl)
+            }
+            Spacer()
+        }
+        .background(.regularMaterial)
+        .presentationDetents([.height(200)])
+        .fullScreenCover(isPresented: $showScanner) {
+            QrScannerView()
+        }
+        .fullScreenCover(isPresented: $showMyQr) {
+            MyQrCodeView()
+        }
+    }
+}
+
+/// 好友请求弹窗
+struct FriendRequestDialog: View {
+    @EnvironmentObject var appState: AppState
+    let request: (id: String, name: String)
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.5).ignoresSafeArea()
+            VStack(spacing: Spacing.lg) {
+                Image(systemName: "person.badge.plus")
+                    .font(.title2)
+                    .foregroundColor(Theme.primary)
+                Text("好友请求")
+                    .font(.title3.bold())
+                    .foregroundColor(Theme.textPrimary)
+                Text("「\(request.name)」请求添加你为联系人")
+                    .font(.subheadline)
+                    .foregroundColor(Theme.textSecondary)
+                Text("ID: \(String(request.id.prefix(8)))")
+                    .font(.caption.monospaced())
+                    .foregroundColor(Theme.textTertiary)
+                HStack(spacing: Spacing.md) {
+                    Button("拒绝") {
+                        appState.pendingFriendRequest = nil
+                    }
+                    .buttonStyle(.bordered)
+                    .tint(Theme.surfaceAlt)
+                    Button("同意") {
+                        appState.pendingFriendRequest = nil
+                        let contact = Contact(deviceId: request.id, name: request.name, status: "approved")
+                        if !appState.contacts.contains(where: { $0.deviceId == request.id }) {
+                            appState.contacts.append(contact)
+                        }
+                        Task {
+                            let url = URL(string: "\(PublicRelay.httpURL)/friend-request")!
+                            var req = URLRequest(url: url)
+                            req.httpMethod = "POST"
+                            req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                            let body: [String: Any] = ["type": "friend-accept", "target": request.id,
+                                                        "from": appState.deviceName, "fromId": appState.deviceId]
+                            req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+                            try? await URLSession.shared.data(for: req)
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.primary)
+                }
+            }
+            .padding(Spacing.xxl)
+            .background(
+                RoundedRectangle(cornerRadius: Radius.large)
+                    .fill(Theme.surface)
+                    .overlay(RoundedRectangle(cornerRadius: Radius.large).stroke(Theme.outline, lineWidth: 1))
+            )
+            .padding(Spacing.xl)
+        }
+    }
+}
