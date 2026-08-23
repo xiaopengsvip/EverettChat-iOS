@@ -26,8 +26,8 @@ struct PageTitleBar: View {
         .frame(minHeight: 32)
         .padding(.horizontal, Spacing.lg)
         .padding(.vertical, Spacing.sm)
-        // 顶栏与内容区分：深一层的背景色 + 可见分割线
-        .background(Theme.bgAlt)
+        // 原生液态玻璃背景（无灰色层）+ 底部细分隔线区分内容
+        .background(GlassSurface(cornerRadius: 0))
         .overlay(alignment: .bottom) {
             Divider().overlay(Theme.outline)
         }
