@@ -103,7 +103,10 @@ struct StorageManagerView: View {
         // 缓存：临时目录
         if let tmp = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first,
            let files = try? FileManager.default.contentsOfDirectory(at: tmp, includingPropertiesForKeys: [.fileSizeKey]) {
-            cacheSize = files.reduce(0) { $0 + (try? $1.resourceValues(forKeys: [.fileSizeKey]).fileSize).map(Int64.init) ?? 0 }
+            cacheSize = files.reduce(Int64(0)) { partial, url in
+                let size = (try? url.resourceValues(forKeys: [.fileSizeKey]).fileSize) ?? 0
+                return partial + Int64(size)
+            }
         }
     }
 

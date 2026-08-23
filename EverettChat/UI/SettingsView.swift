@@ -12,6 +12,7 @@ struct SettingsView: View {
     @State private var showMyQr = false
     @State private var webURL: URL?
     @State private var showSessionPicker = false
+    @State private var showStorageManager = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -131,6 +132,10 @@ struct SettingsView: View {
         // 官网/开发者信息：应用内打开（不跳出 Safari）
         .fullScreenCover(item: $webURL) { url in
             SafariView(url: url)
+        }
+        // 存储管理
+        .sheet(isPresented: $showStorageManager) {
+            StorageManagerView()
         }
         // 恢复密钥展示
         .alert("恢复密钥", isPresented: $showRecoveryKey) {
