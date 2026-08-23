@@ -70,6 +70,23 @@ final class AppState: ObservableObject {
             case "friend-request":
                 let name = (payload["name"] as? String) ?? from
                 let requestSenderId = payload["senderId"] as? String ?? senderId
+                // 扫码即加：自动把对方加入联系人（扫描方已直接建立好友关系）
+                let contact = Contact(deviceId: requestSenderId, name: name, status: "approved")
+                if !self.contacts.contains(where: { $0.deviceId == requestSenderId }) {
+                    self.contacts.append(contact)
+                }
+                // 回复同意（对方收到后也保存）
+                Task {
+                    let url = URL(string: "\(PublicRelay.httpURL)/friend-request")!
+                    var req = URLRequest(url: url)
+                    req.httpMethod = "POST"
+                    req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    let body: [String: Any] = ["type": "friend-accept", "target": requestSenderId,
+                                                "from": self.deviceName, "fromId": self.deviceId]
+                    req.httpBody = try? JSONSerialization.data(withJSONObject: body)
+                    try? await URLSession.shared.data(for: req)
+                }
+                // 仍弹面板让用户知道（可拒绝）
                 self.pendingFriendRequest = (id: requestSenderId, name: name)
             case "text":
                 guard let text = payload["content"] as? String else { return }

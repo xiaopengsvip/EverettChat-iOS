@@ -251,12 +251,15 @@ struct QrScannerView: View {
         // 先关闭扫描页，再延迟打开聊天（避免 dismiss 动画吞掉 showChat）
         dismiss()
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
-            // 已是好友 → 直接进入聊天；否则发请求
-            if self.appState.contacts.contains(where: { $0.deviceId == targetId }) {
-                self.appState.openPeerChat(name: targetName, peerId: targetId)
-            } else {
-                self.appState.sendFriendRequest(targetId: targetId, targetName: targetName)
+            // 扫码即添加（微信逻辑：直接建立好友关系 + 通知对方）
+            let contact = Contact(deviceId: targetId, name: targetName, status: "approved")
+            if !self.appState.contacts.contains(where: { $0.deviceId == targetId }) {
+                self.appState.contacts.append(contact)
             }
+            // 通知对方（HTTP friend-request，对方在线会收到面板/入联系人）
+            self.appState.sendFriendRequest(targetId: targetId, targetName: targetName)
+            // 直接打开聊天
+            self.appState.openPeerChat(name: targetName, peerId: targetId)
         }
     }
 }
