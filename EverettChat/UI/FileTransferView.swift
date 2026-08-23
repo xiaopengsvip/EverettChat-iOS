@@ -29,21 +29,6 @@ struct FileTransferView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶栏
-            ZStack {
-                HStack {
-                    Button { dismiss() } label: {
-                        Image(systemName: "chevron.left").font(.system(size: 18, weight: .medium)).foregroundColor(Theme.textPrimary)
-                    }
-                    Spacer()
-                }
-                Text("文件互传").font(.headline).foregroundColor(Theme.textPrimary)
-            }
-            .padding(.horizontal, Spacing.lg)
-            .padding(.vertical, Spacing.sm)
-            .background(Theme.bgAlt)
-            .overlay(alignment: .bottom) { Divider().overlay(Theme.outline) }
-
             // 模式切换
             Picker("传输模式", selection: $mode) {
                 ForEach(TransferMode.allCases, id: \.self) { m in

@@ -14,55 +14,49 @@ struct MyQrCodeView: View {
     private let context = CIContext()
 
     var body: some View {
-        VStack(spacing: Spacing.xl) {
-            HStack {
-                Button { dismiss() } label: { Image(systemName: "chevron.left").font(.system(size: 18)).foregroundColor(Theme.textPrimary) }
-                Text("我的二维码").font(.headline).foregroundColor(Theme.textPrimary)
+        NavigationStack {
+            VStack(spacing: Spacing.xl) {
                 Spacer()
-            }
-            .padding(Spacing.md)
 
-            Spacer()
+                // 二维码
+                if let img = qrImage {
+                    Image(uiImage: img)
+                        .interpolation(.none)
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 260, height: 260)
+                        .padding(16)
+                        .background(RoundedRectangle(cornerRadius: Radius.large).fill(.white))
+                        .shadow(color: .black.opacity(0.3), radius: 12)
+                } else {
+                    RoundedRectangle(cornerRadius: Radius.large).fill(Theme.surfaceHigh)
+                        .frame(width: 280, height: 280)
+                        .overlay(ProgressView())
+                }
 
-            // 二维码
-            if let img = qrImage {
-                Image(uiImage: img)
-                    .interpolation(.none)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 260, height: 260)
-                    .padding(16)
-                    .background(RoundedRectangle(cornerRadius: Radius.large).fill(.white))
-                    .shadow(color: .black.opacity(0.3), radius: 12)
-            } else {
-                RoundedRectangle(cornerRadius: Radius.large).fill(Theme.surfaceHigh)
-                    .frame(width: 280, height: 280)
-                    .overlay(ProgressView())
-            }
+                Text(appState.deviceName)
+                    .font(.title3.weight(.semibold))
+                    .foregroundColor(.primary)
+                Text("ID: \(String(appState.deviceId.prefix(8)))")
+                    .font(.footnote.monospaced())
+                    .foregroundColor(.secondary)
 
-            Text(appState.deviceName)
-                .font(.title3.weight(.semibold))
-                .foregroundColor(Theme.textPrimary)
-            Text("ID: \(String(appState.deviceId.prefix(8)))")
-                .font(.footnote.monospaced())
-                .foregroundColor(Theme.textTertiary)
-
-            // 保存相册
-            Button {
-                guard let img = qrImage else { return }
-                UIImageWriteToSavedPhotosAlbum(img, nil, nil, nil)
-                showSaved = true
-            } label: {
-                Label("保存到相册", systemImage: "square.and.arrow.down")
-                    .font(.body.weight(.medium))
-                    .foregroundColor(.white)
-                    .padding(.horizontal, Spacing.xxl)
-                    .padding(.vertical, Spacing.md)
-                    .background(RoundedRectangle(cornerRadius: Radius.medium).fill(Theme.primary))
-            }
-            .alert("已保存到相册", isPresented: $showSaved) {
-                Button("好", role: .cancel) {}
-            }
+                // 保存相册
+                Button {
+                    guard let img = qrImage else { return }
+                    UIImageWriteToSavedPhotosAlbum(img, nil, nil, nil)
+                    showSaved = true
+                } label: {
+                    Label("保存到相册", systemImage: "square.and.arrow.down")
+                        .font(.body.weight(.medium))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, Spacing.xxl)
+                        .padding(.vertical, Spacing.md)
+                        .background(RoundedRectangle(cornerRadius: Radius.medium).fill(Theme.primary))
+                }
+                .alert("已保存到相册", isPresented: $showSaved) {
+                    Button("好", role: .cancel) {}
+                }
 
             Text("让对方打开「消息 / 通讯录」右上角 +，点击「扫一扫」扫描此二维码即可添加好友")
                 .font(.caption)
@@ -74,6 +68,14 @@ struct MyQrCodeView: View {
         }
         .background(Theme.bg)
         .onAppear { generateQR() }
+        .navigationTitle("我的二维码")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("关闭") { dismiss() }
+            }
+        }
+        }
     }
 
     /// 生成二维码（协议与 Android 一致：{"t":"evt","id":...,"n":...}）

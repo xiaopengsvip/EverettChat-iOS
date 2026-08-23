@@ -46,7 +46,7 @@ struct RootView: View {
                         .navigationBarTitleDisplayMode(.inline)
                 }
                 .tabItem {
-                    Label("发现", systemImage: appState.selectedTab == .discover ? "sparkles" : "sparkles")
+                    Label("发现", systemImage: appState.selectedTab == .discover ? "sparkles" : "square.grid.2x2")
                 }
                 .tag(MainTab.discover)
 

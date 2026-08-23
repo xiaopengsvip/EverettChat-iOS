@@ -1059,17 +1059,14 @@ struct MessageBubble: View {
     }
 }
 
-/// 模型选择 Sheet
+/// 模型选择 Sheet（系统 List）
 struct ModelPickerSheet: View {
     @Binding var selected: String
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            Text("选择模型")
-                .font(.headline)
-                .padding(Spacing.xl)
-            ForEach(ApiConfig.models) { m in
+        NavigationStack {
+            List(ApiConfig.models) { m in
                 Button {
                     selected = m.id
                     dismiss()
@@ -1079,7 +1076,7 @@ struct ModelPickerSheet: View {
                             .font(.system(size: 20))
                             .foregroundColor(m.vision ? Theme.info : Theme.primary)
                             .frame(width: 28)
-                        VStack(alignment: .leading) {
+                        VStack(alignment: .leading, spacing: 2) {
                             Text(m.name)
                                 .font(.body.weight(selected == m.id ? .semibold : .regular))
                                 .foregroundColor(selected == m.id ? Theme.primary : Theme.textPrimary)
@@ -1093,61 +1090,86 @@ struct ModelPickerSheet: View {
                                 .foregroundColor(Theme.primary)
                         }
                     }
-                    .padding(Spacing.lg)
+                    .padding(.vertical, 2)
                 }
-                Divider().overlay(Theme.surfaceHigh).padding(.leading, 56)
+                .buttonStyle(.plain)
             }
-            Spacer()
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("选择模型")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
         }
-        .background(Theme.surface)
-        .presentationDetents([.height(260)])
+        .presentationDetents([.medium])
     }
 }
 
-/// 会话信息 Sheet
+/// 会话信息 Sheet（系统 List + Section）
 struct ChatInfoSheet: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
     let isAI: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            HStack(spacing: 14) {
-                Circle()
-                    .fill(isAI ? Theme.primaryDim : Theme.surfaceAlt)
-                    .frame(width: 52, height: 52)
-                    .overlay(Image(systemName: isAI ? "sparkles" : "person.fill").font(.system(size: 24)).foregroundColor(Theme.primary))
-                VStack(alignment: .leading) {
-                    Text(isAI ? "AI 助手" : appState.chatPeerName)
-                        .font(.headline)
-                        .foregroundColor(Theme.textPrimary)
-                    Text(isAI ? "云端 AI · 非端到端加密" : "ID: \(appState.chatPeerId)")
-                        .font(.caption2.monospaced())
-                        .foregroundColor(Theme.textTertiary)
+        NavigationStack {
+            List {
+                // 头部：头像 + 名称
+                Section {
+                    HStack(spacing: 14) {
+                        Circle()
+                            .fill(isAI ? Theme.primaryDim : Theme.surfaceAlt)
+                            .frame(width: 52, height: 52)
+                            .overlay(Image(systemName: isAI ? "sparkles" : "person.fill").font(.system(size: 24)).foregroundColor(Theme.primary))
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(isAI ? "AI 助手" : appState.chatPeerName)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            Text(isAI ? "云端 AI · 非端到端加密" : "ID: \(appState.chatPeerId)")
+                                .font(.caption2.monospaced())
+                                .foregroundColor(.secondary)
+                        }
+                        Spacer()
+                    }
+                    .padding(.vertical, 6)
                 }
-                Spacer()
-            }
-            .padding(Spacing.xl)
 
-            Divider().overlay(Theme.surfaceHigh)
-
-            if isAI {
-                InfoRow(icon: "brain.head.profile", title: "当前模型", subtitle: "DeepSeek V4")
-                InfoRow(icon: "antenna.radiowaves.left.and.right", title: "加密说明", subtitle: "AI 对话经云端中继代理，非端到端加密")
-                Button {
-                    appState.aiMessages.removeAll()
-                    dismiss()
-                } label: {
-                    InfoRow(icon: "trash", title: "清除对话", subtitle: "清空当前 AI 会话历史")
+                if isAI {
+                    Section("当前模型") {
+                        InfoRow(icon: "brain.head.profile", title: "DeepSeek V4", subtitle: "支持联网与工具")
+                        InfoRow(icon: "antenna.radiowaves.left.and.right", title: "加密说明", subtitle: "AI 对话经云端中继代理，非端到端加密")
+                    }
+                    Section {
+                        Button(role: .destructive) {
+                            appState.aiMessages.removeAll()
+                            dismiss()
+                        } label: {
+                            Label("清除对话", systemImage: "trash")
+                        }
+                    }
+                } else {
+                    Section("连接") {
+                        InfoRow(icon: "link.icloud", title: "中继连接", subtitle: "云端跨网络")
+                        InfoRow(icon: "lock.shield", title: "加密说明", subtitle: "端到端加密 · 消息仅双方可见")
+                    }
                 }
-            } else {
-                InfoRow(icon: "link.icloud", title: "连接状态", subtitle: "中继连接")
-                InfoRow(icon: "lock.shield", title: "加密说明", subtitle: "端到端加密 · 消息仅双方可见")
             }
-            Spacer()
+            .listStyle(.insetGrouped)
+            .scrollContentBackground(.hidden)
+            .background(Color(.systemGroupedBackground))
+            .navigationTitle("会话信息")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("完成") { dismiss() }
+                }
+            }
         }
-        .background(Theme.surface)
-        .presentationDetents([.height(320)])
+        .presentationDetents([.medium, .large])
     }
 }
 
@@ -1162,16 +1184,13 @@ struct InfoRow: View {
                 .font(.system(size: 17))
                 .foregroundColor(Theme.primary)
                 .frame(width: 28)
-            VStack(alignment: .leading) {
-                Text(title).font(.body).foregroundColor(Theme.textPrimary)
-                Text(subtitle).font(.caption).foregroundColor(Theme.textTertiary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title).font(.body).foregroundColor(.primary)
+                Text(subtitle).font(.caption).foregroundColor(.secondary)
             }
             Spacer()
-            Image(systemName: "chevron.right")
-                .font(.caption)
-                .foregroundColor(Theme.textTertiary)
         }
-        .padding(Spacing.lg)
+        .padding(.vertical, 2)
     }
 }
 
