@@ -9,7 +9,7 @@ struct MessagesView: View {
 
     private var filteredPeers: [Conversation] {
         let peers = appState.conversations
-            .filter { $0.type == "peer" }
+            .filter { $0.type == "peer" || $0.type == "debug" }   // 含调试通道（EVO 调试通道）
             .sorted { $0.lastTime > $1.lastTime }
         guard !searchQuery.isEmpty else { return peers }
         return peers.filter {

@@ -370,8 +370,28 @@ struct ChatView: View {
         }
         // 转发：选择目标会话
         .sheet(item: $forwardTarget) { msg in
-            ForwardSheet(target: msg, appState: appState) { targetId, targetName in
-                appState.conn.sendText(msg.text, target: targetId, messageId: UUID().uuidString)
+            ForwardSheet(target: msg, appState: appState) { forwardedMsg, targetId, targetName in
+                // 按消息类型转发
+                let destId = targetId.isEmpty ? forwardedMsg.senderId : targetId
+                if forwardedMsg.imageBase64.isNotEmpty {
+                    appState.conn.sendImage(base64: forwardedMsg.imageBase64, target: destId,
+                                            name: "forward_image.jpg", mime: "image/jpeg", text: forwardedMsg.text,
+                                            messageId: UUID().uuidString)
+                } else if forwardedMsg.voiceBase64.isNotEmpty {
+                    appState.conn.sendVoice(base64: forwardedMsg.voiceBase64, target: destId,
+                                            durationMs: forwardedMsg.voiceDurationMs,
+                                            messageId: UUID().uuidString)
+                } else if forwardedMsg.videoBase64.isNotEmpty {
+                    appState.conn.sendVideo(base64: forwardedMsg.videoBase64, target: destId,
+                                            durationMs: forwardedMsg.videoDurationMs,
+                                            messageId: UUID().uuidString)
+                } else {
+                    appState.conn.sendText(forwardedMsg.text, target: destId, messageId: UUID().uuidString)
+                }
+                // 本地也加入一条转发记录
+                let outMsg = ChatMessage(role: "user", text: "[转发] \(forwardedMsg.text.prefix(80))",
+                                          senderId: appState.deviceId)
+                appState.peerMessages.append(outMsg)
                 forwardTarget = nil
                 voiceHintText = "已转发给 \(targetName)"
                 showVoiceHint = true
@@ -445,9 +465,21 @@ struct ChatView: View {
 
     /// 写回当前会话消息（合并进全局 peerMessages）
     private func writeBackPeerMessages(_ sessionMsgs: [ChatMessage]) {
-        var all = appState.peerMessages.filter { $0.senderId != appState.chatPeerId }
-        all.append(contentsOf: sessionMsgs)
-        appState.peerMessages = all.sorted { $0.createdAt < $1.createdAt }
+        // 去重：按 id 合并，避免 onReceive → onChange 循环导致消息无限膨胀（卡死根因）
+        var merged: [String: ChatMessage] = [:]
+        // 其他会话的消息
+        for m in appState.peerMessages where m.senderId != appState.chatPeerId {
+            merged[m.id] = m
+        }
+        // 当前会话消息（后写覆盖）
+        for m in sessionMsgs {
+            merged[m.id] = m
+        }
+        let result = merged.values.sorted { $0.createdAt < $1.createdAt }
+        // 内容相同则不触发 @Published 更新，防止写回循环
+        if result.map(\.id) != appState.peerMessages.map(\.id) {
+            appState.peerMessages = result
+        }
     }
 
     private var currentModel: ApiConfig.ModelInfo {
@@ -1938,15 +1970,15 @@ struct ModelSwitcherRow: View {
 struct ForwardSheet: View {
     let target: ChatMessage
     let appState: AppState
-    let onForward: (String, String) -> Void
+    let onForward: (ChatMessage, String, String) -> Void
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         NavigationStack {
             List {
-                // AI 助手
+                // AI 助手（转发为文本给 AI 上下文）
                 Button {
-                    onForward("", "AI 助手")
+                    onForward(target, "", "AI 助手")
                     dismiss()
                 } label: {
                     Label("AI 助手", systemImage: "sparkles")
@@ -1957,7 +1989,7 @@ struct ForwardSheet: View {
                 let peers = appState.conversations.filter { $0.type == "peer" }
                 ForEach(peers) { conv in
                     Button {
-                        onForward(conv.id, conv.name)
+                        onForward(target, conv.id, conv.name)
                         dismiss()
                     } label: {
                         Label(conv.name, systemImage: "person.circle")
