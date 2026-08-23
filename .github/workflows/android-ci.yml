@@ -54,9 +54,16 @@ jobs:
 
       - name: 安装最新 SDK（API 36 + Build Tools）
         run: |
-          sdkmanager --install "platforms;android-36" "build-tools;37.0.0" "platform-tools" > /dev/null 2>&1 || \
-            (yes | sdkmanager --install "platforms;android-36" "build-tools;37.0.0" "platform-tools")
-          sdkmanager --list_installed | grep -E "platforms|build-tools" | tail -5
+          export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -f "$SDKMANAGER" ]; then
+            SDKMANAGER=$(find "$ANDROID_HOME" -name sdkmanager 2>/dev/null | head -1)
+          fi
+          echo "sdkmanager: $SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          yes | "$SDKMANAGER" --install "platforms;android-36" "build-tools;37.0.0" "platform-tools" 2>&1 | tail -5 || true
+          "$SDKMANAGER" --list_installed 2>/dev/null | grep -E "platforms|build-tools" | tail -5 || ls "$ANDROID_HOME/platforms" "$ANDROID_HOME/build-tools" 2>/dev/null
 
       - name: Build Debug APK
         run: |
