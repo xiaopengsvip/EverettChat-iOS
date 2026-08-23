@@ -44,6 +44,26 @@ struct DeviceLinkView: View {
                             .foregroundColor(.secondary)
                             .disabled(isConnected)
                     }
+                    // 快捷地址：局域网 / Tailscale（VPN 互通）
+                    if !isConnected {
+                        HStack(spacing: 8) {
+                            Text("快捷")
+                            Spacer()
+                            Button("局域网 172.11.8.35") {
+                                host = "172.11.8.35"
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                            Button("Tailscale 100.101.164.60") {
+                                host = "100.101.164.60"
+                            }
+                            .buttonStyle(.bordered)
+                            .controlSize(.small)
+                        }
+                        Text("同一 Wi-Fi 用局域网；异地 / VPN 用 Tailscale（需本机已登录）")
+                            .font(.caption2)
+                            .foregroundColor(.secondary)
+                    }
                     if isConnected {
                         HStack {
                             Text("状态")
