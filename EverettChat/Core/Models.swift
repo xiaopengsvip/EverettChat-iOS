@@ -87,9 +87,18 @@ enum MainTab: String, CaseIterable {
 
     var icon: String {
         switch self {
+        case .messages: return "message"
+        case .contacts: return "person.2"
+        case .discover: return "sparkles"
+        case .mine: return "person"
+        }
+    }
+
+    var selectedIcon: String {
+        switch self {
         case .messages: return "message.fill"
         case .contacts: return "person.2.fill"
-        case .discover: return "dot.radiowaves.left.and.right"
+        case .discover: return "sparkles"
         case .mine: return "person.fill"
         }
     }

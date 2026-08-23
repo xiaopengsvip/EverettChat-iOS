@@ -85,7 +85,7 @@ struct MainTabView: View {
     }
 }
 
-/// 悬浮底部导航（原生 Liquid Glass）
+/// 悬浮底部导航（原生 iOS 风格：薄、透明、系统材质、SF Symbols）
 struct FloatingTabBar: View {
     @Binding var selected: MainTab
 
@@ -97,27 +97,30 @@ struct FloatingTabBar: View {
                     selected = tab
                 } label: {
                     VStack(spacing: 3) {
-                        Image(systemName: tab.icon)
-                            .font(.system(size: 21))
-                            .scaleEffect(isSelected ? 1.12 : 1.0)
+                        // SF Symbols（系统图标）
+                        Image(systemName: isSelected ? tab.selectedIcon : tab.icon)
+                            .font(.system(size: 21, weight: isSelected ? .semibold : .regular))
+                            .symbolRenderingMode(.hierarchical)
+                            .foregroundStyle(isSelected ? AnyShapeStyle(Theme.primary) : AnyShapeStyle(Color.secondary))
                         Text(tab.rawValue)
                             .font(.system(size: 10, weight: isSelected ? .semibold : .regular))
-                        RoundedRectangle(cornerRadius: 2)
-                            .fill(Theme.primary)
-                            .frame(width: 14, height: 3)
-                            .opacity(isSelected ? 1 : 0)
+                            .foregroundStyle(isSelected ? AnyShapeStyle(Theme.primary) : AnyShapeStyle(Color.secondary))
                     }
-                    .foregroundColor(isSelected ? Theme.textPrimary : Theme.textTertiary)
                     .frame(maxWidth: .infinity)
+                    .contentShape(Rectangle())
                 }
+                .buttonStyle(.plain)
             }
         }
-        .padding(.vertical, 10)
-        // 原生 Liquid Glass：iOS 26+ 系统 glassEffect，低版本 ultraThinMaterial
-        .background {
-            GlassSurface(cornerRadius: Radius.floating)
+        .padding(.vertical, 8)
+        // 系统级材质：极轻、透明、无描边无阴影
+        .background(.ultraThinMaterial.opacity(0.75))
+        .overlay(alignment: .top) {
+            Rectangle()
+                .fill(Color.secondary.opacity(0.08))
+                .frame(height: 0.5)
         }
-        .padding(.horizontal, Spacing.lg)
+        .padding(.horizontal, Spacing.md)
         .padding(.bottom, Spacing.sm)
     }
 }
@@ -140,7 +143,7 @@ struct AddFriendSheet: View {
             } label: {
                 Label("扫一扫", systemImage: "qrcode.viewfinder")
                     .font(.body)
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(Spacing.xl)
             }
@@ -152,13 +155,13 @@ struct AddFriendSheet: View {
             } label: {
                 Label("我的二维码", systemImage: "qrcode")
                     .font(.body)
-                    .foregroundColor(Theme.textPrimary)
+                    .foregroundColor(.primary)
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(Spacing.xl)
             }
             Spacer()
         }
-        .background(Theme.surface)
+        .background(.regularMaterial)
         .presentationDetents([.height(200)])
         // 在当前页面直接全屏打开扫一扫/二维码（不跳转其他页面）
         .fullScreenCover(isPresented: $showScanner) {

@@ -13,14 +13,14 @@ struct DiscoverView: View {
 
             ScrollView {
                 VStack(spacing: 0) {
-                    FeatureRow(icon: "🎮", name: "游戏中心", desc: "game.vios.top · 原生打开") { showGame = true }
-                    FeatureRow(icon: "📁", name: "文件互传", desc: "NFC 碰一碰 / 蓝牙 / 局域网") { featurePage = "ft" }
-                    FeatureRow(icon: "📡", name: "局域网直连", desc: "同一 Wi-Fi · 配对码/扫描") { featurePage = "lan" }
-                    FeatureRow(icon: "☁️", name: "云中继", desc: "公网跨网络 · 在线设备") { featurePage = "relay" }
-                    FeatureRow(icon: "📶", name: "蓝牙直连", desc: "近距离 · 无需 Wi-Fi") { featurePage = "bt" }
-                    FeatureRow(icon: "🌐", name: "中继网可视化", desc: "实时拓扑 / 在线用户") { featurePage = "topo" }
-                    FeatureRow(icon: "🪪", name: "我的二维码", desc: "扫码互加好友") { appState.showMyQr = true }
-                    FeatureRow(icon: "📷", name: "扫一扫", desc: "扫描二维码添加好友") { appState.showQrScanner = true }
+                    FeatureRow(icon: "gamecontroller", name: "游戏中心", desc: "game.vios.top · 原生打开") { showGame = true }
+                    FeatureRow(icon: "arrow.up.arrow.down", name: "文件互传", desc: "NFC 碰一碰 / 蓝牙 / 局域网") { featurePage = "ft" }
+                    FeatureRow(icon: "wifi", name: "局域网直连", desc: "同一 Wi-Fi · 配对码/扫描") { featurePage = "lan" }
+                    FeatureRow(icon: "cloud", name: "云中继", desc: "公网跨网络 · 在线设备") { featurePage = "relay" }
+                    FeatureRow(icon: "wave.3.right", name: "蓝牙直连", desc: "近距离 · 无需 Wi-Fi") { featurePage = "bt" }
+                    FeatureRow(icon: "point.3.connected.trianglepath.dotted", name: "中继网可视化", desc: "实时拓扑 / 在线用户") { featurePage = "topo" }
+                    FeatureRow(icon: "qrcode", name: "我的二维码", desc: "扫码互加好友") { appState.showMyQr = true }
+                    FeatureRow(icon: "qrcode.viewfinder", name: "扫一扫", desc: "扫描二维码添加好友") { appState.showQrScanner = true }
                 }
             }
         }
@@ -50,7 +50,7 @@ enum FeaturePage: String, Identifiable {
 }
 
 struct FeatureRow: View {
-    let icon: String
+    let icon: String   // SF Symbol
     let name: String
     let desc: String
     let action: () -> Void
@@ -58,7 +58,14 @@ struct FeatureRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: 14) {
-                Text(icon).font(.title3)
+                ZStack {
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
+                        .fill(Theme.primary.opacity(0.12))
+                        .frame(width: 38, height: 38)
+                    Image(systemName: icon)
+                        .font(.system(size: 17))
+                        .foregroundColor(Theme.primary)
+                }
                 VStack(alignment: .leading) {
                     Text(name).font(.body.weight(.medium)).foregroundColor(Theme.textPrimary)
                     Text(desc).font(.caption).foregroundColor(Theme.textTertiary)

@@ -22,7 +22,7 @@ struct MessagesView: View {
 
                     // AI 助手固定置顶
                     ConversationRow(
-                        icon: "🤖",
+                        icon: "sparkles",
                         name: "AI 助手",
                         subtitle: appState.aiMessages.last?.text ?? "开始聊天吧",
                         time: appState.aiMessages.isEmpty ? "" : "现在",
@@ -93,7 +93,7 @@ struct ConversationRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.md) {
-                // 头像（优先图片，其次 emoji/占位）
+                // 头像（优先图片，其次 SF Symbol/占位）
                 ZStack {
                     Circle()
                         .fill(accent ? Theme.primaryDim : Theme.surfaceAlt)
@@ -104,8 +104,9 @@ struct ConversationRow: View {
                             .frame(width: 48, height: 48)
                             .clipShape(Circle())
                     } else {
-                        Text(icon)
-                            .font(.system(size: 22))
+                        Image(systemName: icon)
+                            .font(.system(size: 20))
+                            .foregroundColor(accent ? Theme.primary : Theme.textSecondary)
                     }
                 }
                 .frame(width: 48, height: 48)
