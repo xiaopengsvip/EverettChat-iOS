@@ -74,7 +74,8 @@ final class WebRTCEngine: NSObject, ObservableObject {
         callId = UUID().uuidString
         setupPeerConnection(video: videoEnabled)
         guard let pc = peerConnection else { return }
-        pc.offer { [weak self] sdp, _ in
+        let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: ["DtlsSrtpKeyAgreement": "true"])
+        pc.offer(constraints) { [weak self] sdp, _ in
             guard let sdp else { return }
             self?.setLocalAndSend(sdp, type: "call-offer")
         }
@@ -113,7 +114,7 @@ final class WebRTCEngine: NSObject, ObservableObject {
             #if targetEnvironment(simulator)
             // 模拟器无摄像头
             #else
-            let capturer = RTCCameraVideoCapturer(videoSource: videoSource)
+            let capturer = RTCCameraVideoCapturer(delegate: videoSource)
             if let cam = RTCCameraVideoCapturer.captureDevices().first {
                 let fmt = RTCCameraVideoCapturer.supportedFormats(for: cam).first
                 if let fmt {
@@ -135,9 +136,11 @@ final class WebRTCEngine: NSObject, ObservableObject {
     private func receiveOffer(_ sdpString: String) {
         let sdp = RTCSessionDescription(type: .offer, sdp: sdpString)
         peerConnection?.setRemoteDescription(sdp) { [weak self] _ in
-            self?.peerConnection?.answer { sdp, _ in
+            guard let self, let pc = self.peerConnection else { return }
+            let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: ["DtlsSrtpKeyAgreement": "true"])
+            pc.answer(constraints) { sdp, _ in
                 guard let sdp else { return }
-                self?.setLocalAndSend(sdp, type: "call-answer")
+                self.setLocalAndSend(sdp, type: "call-answer")
             }
         }
     }
@@ -149,6 +152,8 @@ final class WebRTCEngine: NSObject, ObservableObject {
 }
 
 extension WebRTCEngine: RTCPeerConnectionDelegate {
+    func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {}
+
     func peerConnection(_ peerConnection: RTCPeerConnection, didAdd stream: RTCMediaStream) {
         if let track = stream.videoTracks.first {
             remoteVideoTrack = track
@@ -173,9 +178,11 @@ extension WebRTCEngine: RTCPeerConnectionDelegate {
         }
     }
 
-    func peerConnection(_ peerConnection: RTCPeerConnection, didChange stateChanged: RTCSignalingState) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didRemove stream: RTCMediaStream) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didRemove candidates: [RTCIceCandidate]) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didOpen dataChannel: RTCDataChannel) {}
     func peerConnection(_ peerConnection: RTCPeerConnection, didChange newState: RTCIceGatheringState) {}
+    func peerConnectionShouldNegotiate(_ peerConnection: RTCPeerConnection) {}
+    func peerConnection(_ peerConnection: RTCPeerConnection, didUpdateLocalCandidate local: RTCIceCandidate, remote: RTCIceCandidate) {}
+    func peerConnection(_ peerConnection: RTCPeerConnection, didFailToGatherCandidatesForDescription description: RTCSessionDescription, error: Error) {}
 }
