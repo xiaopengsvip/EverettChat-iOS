@@ -11,6 +11,13 @@ struct EvoActivityAttributes: ActivityAttributes {
         var toolName: String = ""            // 当前工具
         var fileName: String = ""            // 当前文件/会话
         var isFinished: Bool = false
+
+        // 会话消息模式（chatType 非空时显示消息，否则显示 AI 任务进度）
+        var chatType: String = ""            // "ai" | "peer" | "device" | ""（任务模式）
+        var messageText: String = ""         // 最新消息预览
+        var senderName: String = ""          // 发送者
+        var isMine: Bool = false             // 是否自己发的
+        var messageCount: Int = 0            // 新消息条数（未读）
     }
 
     /// 静态内容

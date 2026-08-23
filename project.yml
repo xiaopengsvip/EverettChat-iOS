@@ -32,6 +32,9 @@ targets:
         UILaunchStoryboardName: LaunchScreen
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
         UIRequiresFullScreen: true
+        CFBundleURLTypes:
+          - CFBundleURLName: top.vios.chat
+            CFBundleURLSchemes: [evo]
         NSCameraUsageDescription: "用于视频通话与扫码添加好友"
         NSMicrophoneUsageDescription: "用于语音消息与语音通话"
         NSPhotoLibraryUsageDescription: "用于发送图片与保存二维码"

@@ -8,10 +8,80 @@ struct EvoLiveActivityView: View {
     @Environment(\.colorScheme) private var colorScheme
     private var dark: Bool { colorScheme == .dark }
 
+    private var isChatMode: Bool { !context.state.chatType.isEmpty }
+
     var body: some View {
-        switch context.state.isFinished {
-        case true: finishedView
-        default: activeView
+        if isChatMode {
+            chatMessageView
+        } else {
+            switch context.state.isFinished {
+            case true: finishedView
+            default: activeView
+            }
+        }
+    }
+
+    // MARK: - 会话消息模式（锁屏横幅：最新消息预览）
+    private var chatMessageView: some View {
+        HStack(spacing: 10) {
+            // 会话图标（按类型）
+            ZStack {
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(chatColor)
+                Image(systemName: chatIcon)
+                    .font(.system(size: 11, weight: .bold))
+                    .foregroundColor(.white)
+            }
+            .frame(width: 28, height: 28)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(context.attributes.peerName)
+                        .font(.caption2.weight(.semibold))
+                        .foregroundColor(dark ? Color(hex: 0xF5F5F7) : Color(hex: 0x171717))
+                        .lineLimit(1)
+                    if context.state.messageCount > 0 {
+                        Text("\(context.state.messageCount) 条新消息")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(Color(hex: 0x8B72FF)))
+                    }
+                }
+                if !context.state.messageText.isEmpty {
+                    Text("\(context.state.senderName.isEmpty ? "" : context.state.senderName + "：")\(context.state.messageText)")
+                        .font(.caption2)
+                        .foregroundColor(dark ? Color(hex: 0xA1A1A6) : Color(hex: 0x6F7075))
+                        .lineLimit(2)
+                } else {
+                    Text("会话进行中，有新消息时这里会显示预览")
+                        .font(.caption2)
+                        .foregroundColor(dark ? Color(hex: 0x6E6E73) : Color(hex: 0x9A9BA0))
+                        .lineLimit(1)
+                }
+            }
+            Spacer(minLength: 4)
+            Image(systemName: "chevron.right")
+                .font(.caption2.weight(.semibold))
+                .foregroundColor(dark ? Color(hex: 0x6E6E73) : Color(hex: 0x9A9BA0))
+        }
+        .padding(.horizontal, 12)
+    }
+
+    private var chatIcon: String {
+        switch context.state.chatType {
+        case "ai": return "sparkles"
+        case "device": return "desktopcomputer"
+        default: return "person.fill"
+        }
+    }
+
+    private var chatColor: Color {
+        switch context.state.chatType {
+        case "ai": return Color(hex: 0x8B72FF)
+        case "device": return Color(hex: 0x007AFF)
+        default: return Color(hex: 0x34C759)
         }
     }
 
@@ -139,20 +209,41 @@ struct EvoLiveActivity: Widget {
                     .frame(width: 30, height: 30)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text("\(context.state.status)")
+                    Text(context.state.chatType.isEmpty ? context.state.status : context.attributes.peerName)
                         .font(.caption.weight(.semibold))
                         .foregroundColor(Color(hex: 0xF5F5F7))
                 }
                 DynamicIslandExpandedRegion(.center) {
-                    VStack(spacing: 2) {
-                        if !context.state.stepText.isEmpty {
-                            Text(context.state.stepText).font(.caption2).foregroundColor(Color(hex: 0xA1A1A6))
+                    if !context.state.chatType.isEmpty {
+                        // 消息模式：显示最新消息
+                        VStack(spacing: 2) {
+                            if !context.state.messageText.isEmpty {
+                                Text(context.state.messageText)
+                                    .font(.caption2)
+                                    .foregroundColor(Color(hex: 0xF5F5F7))
+                                    .lineLimit(2)
+                            } else {
+                                Text("有新消息时这里会显示")
+                                    .font(.caption2)
+                                    .foregroundColor(Color(hex: 0x9A9BA0))
+                            }
+                            if context.state.messageCount > 0 {
+                                Text("\(context.state.messageCount) 条新消息")
+                                    .font(.system(size: 9, weight: .bold))
+                                    .foregroundColor(Color(hex: 0x8B72FF))
+                            }
                         }
-                        if !context.state.fileName.isEmpty {
-                            Text(context.state.fileName).font(.system(size: 10)).foregroundColor(Color(hex: 0x6E6E73)).lineLimit(1)
+                    } else {
+                        VStack(spacing: 2) {
+                            if !context.state.stepText.isEmpty {
+                                Text(context.state.stepText).font(.caption2).foregroundColor(Color(hex: 0xA1A1A6))
+                            }
+                            if !context.state.fileName.isEmpty {
+                                Text(context.state.fileName).font(.system(size: 10)).foregroundColor(Color(hex: 0x6E6E73)).lineLimit(1)
+                            }
+                            ProgressView(value: context.state.progress)
+                                .tint(Color(hex: 0x8B72FF))
                         }
-                        ProgressView(value: context.state.progress)
-                            .tint(Color(hex: 0x8B72FF))
                     }
                 }
                 DynamicIslandExpandedRegion(.bottom) {
@@ -173,8 +264,18 @@ struct EvoLiveActivity: Widget {
             } minimal: {
                 EvoMinimalView(state: context.state)
             }
-            .widgetURL(URL(string: "evo://chat/\(context.attributes.sessionId)"))
+            .widgetURL(URL(string: chatDeepLink))
             .keylineTint(Color(hex: 0x8B72FF))
+        }
+    }
+
+    /// 深链：evo://chat/<type>/<id> —— 按会话类型跳回对应聊天
+    private var chatDeepLink: String {
+        switch context.state.chatType {
+        case "ai": return "evo://chat/ai"
+        case "device": return "evo://chat/device"
+        case "peer": return "evo://chat/peer/\(context.attributes.sessionId)"
+        default: return "evo://chat/ai"
         }
     }
 
