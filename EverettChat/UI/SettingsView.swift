@@ -15,6 +15,11 @@ struct SettingsView: View {
     @State private var showSessionPicker = false
     @State private var showStorageManager = false
     @State private var showProfileEdit = false
+    @State private var showTurnConfig = false
+
+    private var turnConfigured: Bool {
+        !(UserDefaults.standard.string(forKey: "turn_url") ?? "").isEmpty
+    }
 
     var body: some View {
         VStack(spacing: 0) {
@@ -106,6 +111,8 @@ struct SettingsView: View {
                         Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
                         SettingRow(icon: "🛰", title: "中继服务器", subtitle: "已配置 · \(PublicRelay.httpURL)") {}
                         Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
+                        SettingRow(icon: "🌐", title: "TURN 服务器", subtitle: turnConfigured ? "已配置（通话兜底）" : "未配置（Cloudflare Calls）") { showTurnConfig = true }
+                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
                         // 自动删除消息（TTL）
                         let autoDays = UserDefaults.standard.integer(forKey: "auto_delete_days")
                         SettingRow(icon: "⏱", title: "自动删除消息", subtitle: autoDays == 0 ? "不自动删除" : "保留 \(autoDays) 天") {
@@ -164,6 +171,10 @@ struct SettingsView: View {
         // 个人资料编辑
         .sheet(isPresented: $showProfileEdit) {
             ProfileEditView()
+        }
+        // TURN 服务器配置
+        .sheet(isPresented: $showTurnConfig) {
+            TurnConfigView()
         }
         // 恢复密钥展示
         .alert("恢复密钥", isPresented: $showRecoveryKey) {
