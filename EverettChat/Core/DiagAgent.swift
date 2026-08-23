@@ -111,7 +111,7 @@ final class DiagAgent {
     }
 
     private func getStatus() async -> String {
-        let relay = RelayTransport.shared
+        guard let relay = RelayTransport.shared else { return "relay not initialized" }
         let isConnected = relay.isConnected
         let onlineCount = relay.onlineUsers.count
         let peerName = relay.peerName
@@ -128,7 +128,7 @@ final class DiagAgent {
     }
 
     private func reconnect() async -> String {
-        let relay = RelayTransport.shared
+        guard let relay = RelayTransport.shared else { return "relay not initialized" }
         relay.disconnect()
         try? await Task.sleep(nanoseconds: 1_000_000_000)
         relay.connect()
