@@ -7,15 +7,9 @@ struct ContactsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶栏（统一 PageTitleBar）
-            PageTitleBar(title: "通讯录") {
-                TitleBarButton(icon: "qrcode") {
-                    appState.showMyQr = true
-                }
-            }
-
-            // 搜索（原生液态玻璃）
+            // 搜索（系统搜索样式）
             GlassSearchBar(text: $searchQuery, placeholder: "搜索联系人")
+                .padding(.top, 8)
 
             // 我的名片
             HStack(spacing: Spacing.md) {

@@ -17,138 +17,138 @@ struct SettingsView: View {
     @State private var showProfileEdit = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 顶栏（统一 PageTitleBar）
-            PageTitleBar(title: "设置")
-
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    // 用户卡片（头像 + 名称 + 签名，点击进资料页）
-                    Button {
-                        showProfileEdit = true
-                    } label: {
-                        HStack(spacing: Spacing.md) {
-                            // 头像（与聊天/会话列表打通）
-                            if let img = ProfileStore.shared.myAvatarImage {
-                                Image(uiImage: img)
-                                    .resizable()
-                                    .scaledToFill()
-                                    .frame(width: 56, height: 56)
-                                    .clipShape(Circle())
-                                    .overlay(Circle().stroke(Theme.outline, lineWidth: 1))
-                            } else {
-                                LivingAvatarBubble(state: .idle, size: 56)
-                                    .frame(width: 56, height: 56)
-                            }
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(ProfileStore.shared.myProfile.name.isEmpty ? appState.deviceName : ProfileStore.shared.myProfile.name)
-                                    .font(.body.weight(.semibold))
-                                    .foregroundColor(Theme.textPrimary)
-                                Text(ProfileStore.shared.myProfile.signature.isEmpty ? "这个人很懒，什么都没写~" : ProfileStore.shared.myProfile.signature)
-                                    .font(.caption)
-                                    .foregroundColor(Theme.textTertiary)
-                                    .lineLimit(1)
-                                Text("唯一 ID: \(String(appState.deviceId.prefix(8)))")
-                                    .font(.caption2.monospaced())
-                                    .foregroundColor(Theme.textTertiary)
-                            }
-                            Spacer()
-                            Image(systemName: "chevron.right")
+        List {
+            // 个人资料卡片
+            Section {
+                Button {
+                    showProfileEdit = true
+                } label: {
+                    HStack(spacing: 14) {
+                        if let img = ProfileStore.shared.myAvatarImage {
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 56, height: 56)
+                                .clipShape(Circle())
+                        } else {
+                            LivingAvatarBubble(state: .idle, size: 56)
+                                .frame(width: 56, height: 56)
+                        }
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text(ProfileStore.shared.myProfile.name.isEmpty ? appState.deviceName : ProfileStore.shared.myProfile.name)
+                                .font(.headline)
+                                .foregroundColor(.primary)
+                            Text(ProfileStore.shared.myProfile.signature.isEmpty ? "这个人很懒，什么都没写~" : ProfileStore.shared.myProfile.signature)
                                 .font(.caption)
-                                .foregroundColor(Theme.textTertiary)
+                                .foregroundColor(.secondary)
+                                .lineLimit(1)
+                            Text("唯一 ID: \(String(appState.deviceId.prefix(8)))")
+                                .font(.caption2.monospaced())
+                                .foregroundColor(.secondary)
                         }
-                        .padding(Spacing.lg)
-                        .background(
-                            RoundedRectangle(cornerRadius: Radius.medium)
-                                .fill(Theme.surface)
-                                .overlay(RoundedRectangle(cornerRadius: Radius.medium).stroke(Theme.outline, lineWidth: 1))
-                        )
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .padding(.horizontal, Spacing.lg)
-
-                    sectionHeader("外观")
-                    VStack(spacing: 0) {
-                        ThemeModeRow(title: "跟随系统", mode: "system") {
-                            applyThemeMode("system")
-                        }
-                        Divider().overlay(Theme.surfaceHigh).padding(.leading, Spacing.lg)
-                        ThemeModeRow(title: "珍珠白 · Pearl White", mode: "light") {
-                            applyThemeMode("light")
-                        }
-                        Divider().overlay(Theme.surfaceHigh).padding(.leading, Spacing.lg)
-                        ThemeModeRow(title: "深邃黑 · Deep Black", mode: "dark") {
-                            applyThemeMode("dark")
-                        }
-                    }
-                    .background(
-                        RoundedRectangle(cornerRadius: Radius.medium)
-                            .fill(Theme.surface)
-                            .overlay(
-                                RoundedRectangle(cornerRadius: Radius.medium)
-                                    .stroke(Theme.outline, lineWidth: 1)
-                            )
-                    )
-                    .padding(.horizontal, Spacing.lg)
-
-                    sectionHeader("设备与通用")
-                    settingsCard {
-                        SettingRow(icon: "✏️", title: "设备名称", subtitle: appState.deviceName) {
-                            // 改名（简化为随机换名）
-                            _ = DeviceIdentity.shared.rerollName()
-                            appState.objectWillChange.send()
-                        }
-                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        SettingRow(icon: "🔋", title: "后台保活", subtitle: "前台保活 · 电池优化白名单") {}
-                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        SettingRow(icon: "🔗", title: "连接保持", subtitle: SessionDuration.current.label) { showSessionPicker = true }
-                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        SettingRow(icon: "🛰", title: "中继服务器", subtitle: "已配置 · \(PublicRelay.httpURL)") {}
-                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        // 自动删除消息（TTL）
-                        let autoDays = UserDefaults.standard.integer(forKey: "auto_delete_days")
-                        SettingRow(icon: "⏱", title: "自动删除消息", subtitle: autoDays == 0 ? "不自动删除" : "保留 \(autoDays) 天") {
-                            showAutoDelete = true
-                        }
-                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        SettingRow(icon: "📝", title: "反馈", subtitle: "问题与建议") {}
-                    }
-
-                    sectionHeader("存储")
-                    settingsCard {
-                        SettingRow(icon: "💾", title: "存储管理", subtitle: "分类占用 · 清理缓存") { showStorageManager = true }
-                    }
-
-                    sectionHeader("身份")
-                    settingsCard {
-                        SettingRow(icon: "🔑", title: "恢复密钥", subtitle: "保存此密钥，换机可恢复身份") {
-                            showRecoveryKey = true
-                        }
-                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        SettingRow(icon: "♻️", title: "恢复身份", subtitle: "输入恢复密钥找回身份") {
-                            showRestore = true
-                        }
-                    }
-
-                    sectionHeader("关于")
-                    settingsCard {
-                        SettingRow(icon: "📱", title: "版本", subtitle: "v1.0.0 · iOS") {}
-                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        SettingRow(icon: "🌐", title: "官网", subtitle: "vios.top") { openWeb("https://vios.top/") }
-                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        SettingRow(icon: "👨‍💻", title: "开发者信息", subtitle: "linktr.vios.top") { openWeb("https://linktr.vios.top/") }
-                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        SettingRow(icon: "✉️", title: "邮箱", subtitle: "EVO@vios.top") {
-                            if let url = URL(string: "mailto:EVO@vios.top") {
-                                UIApplication.shared.open(url)
-                            }
-                        }
+                        Spacer()
+                        Image(systemName: "chevron.right")
+                            .font(.caption)
+                            .foregroundColor(.tertiary)
                     }
                 }
+                .buttonStyle(.plain)
+            }
+
+            // 外观
+            Section {
+                Picker("外观", selection: themeModeBinding) {
+                    Text("跟随系统").tag("system")
+                    Text("珍珠白").tag("light")
+                    Text("深邃黑").tag("dark")
+                }
+                .pickerStyle(.inline)
+            } header: {
+                Text("外观")
+            }
+
+            // 设备与通用
+            Section {
+                Button {
+                    _ = DeviceIdentity.shared.rerollName()
+                    appState.objectWillChange.send()
+                } label: {
+                    SettingsRowLabel(icon: "pencil", title: "设备名称", subtitle: appState.deviceName)
+                }
+                SettingsRowLabel(icon: "battery.100percent", title: "后台保活", subtitle: "前台保活 · 电池优化白名单")
+                Button {
+                    showSessionPicker = true
+                } label: {
+                    SettingsRowLabel(icon: "link", title: "连接保持", subtitle: SessionDuration.current.label)
+                }
+                SettingsRowLabel(icon: "server.rack", title: "中继服务器", subtitle: "已配置 · \(PublicRelay.httpURL)")
+                Button {
+                    showAutoDelete = true
+                } label: {
+                    SettingsRowLabel(icon: "clock.arrow.circlepath", title: "自动删除消息",
+                                     subtitle: {
+                                         let days = UserDefaults.standard.integer(forKey: "auto_delete_days")
+                                         return days == 0 ? "不自动删除" : "保留 \(days) 天"
+                                     }())
+                }
+                SettingsRowLabel(icon: "text.bubble", title: "反馈", subtitle: "问题与建议")
+            } header: {
+                Text("设备与通用")
+            }
+
+            // 存储
+            Section {
+                Button {
+                    showStorageManager = true
+                } label: {
+                    SettingsRowLabel(icon: "internaldrive", title: "存储管理", subtitle: "分类占用 · 清理缓存")
+                }
+            } header: {
+                Text("存储")
+            }
+
+            // 身份
+            Section {
+                Button {
+                    showRecoveryKey = true
+                } label: {
+                    SettingsRowLabel(icon: "key", title: "恢复密钥", subtitle: "保存此密钥，换机可恢复身份")
+                }
+                Button {
+                    showRestore = true
+                } label: {
+                    SettingsRowLabel(icon: "arrow.clockwise.circle", title: "恢复身份", subtitle: "输入恢复密钥找回身份")
+                }
+            } header: {
+                Text("身份")
+            }
+
+            // 关于
+            Section {
+                SettingsRowLabel(icon: "iphone", title: "版本", subtitle: "v1.0.0 · iOS")
+                Button {
+                    openWeb("https://vios.top/")
+                } label: {
+                    SettingsRowLabel(icon: "globe", title: "官网", subtitle: "vios.top")
+                }
+                Button {
+                    openWeb("https://linktr.vios.top/")
+                } label: {
+                    SettingsRowLabel(icon: "person.crop.circle.badge.questionmark", title: "开发者信息", subtitle: "linktr.vios.top")
+                }
+                Button {
+                    if let url = URL(string: "mailto:EVO@vios.top") {
+                        UIApplication.shared.open(url)
+                    }
+                } label: {
+                    SettingsRowLabel(icon: "envelope", title: "邮箱", subtitle: "EVO@vios.top")
+                }
+            } header: {
+                Text("关于")
             }
         }
-        .background(Theme.bg)
+        .listStyle(.insetGrouped)
+        .background(Color(.systemGroupedBackground).ignoresSafeArea())
         // 我的二维码：当前页面直接全屏打开（不跳转）
         .fullScreenCover(isPresented: $showMyQr) {
             MyQrCodeView()
@@ -225,32 +225,6 @@ struct SettingsView: View {
         }
     }
 
-    private func sectionHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.caption)
-            .foregroundColor(Theme.textTertiary)
-            .padding(.leading, Spacing.lg)
-            .padding(.top, Spacing.md)
-            .padding(.bottom, 4)
-    }
-
-    /// 统一设置卡片容器（圆角 + 边框）
-    @ViewBuilder
-    private func settingsCard<Content: View>(@ViewBuilder content: () -> Content) -> some View {
-        VStack(spacing: 0) {
-            content()
-        }
-        .background(
-            RoundedRectangle(cornerRadius: Radius.medium)
-                .fill(Theme.surface)
-                .overlay(
-                    RoundedRectangle(cornerRadius: Radius.medium)
-                        .stroke(Theme.outline, lineWidth: 1)
-                )
-        )
-        .padding(.horizontal, Spacing.lg)
-    }
-
     private func applyThemeMode(_ mode: String) {
         UserDefaults.standard.set(mode, forKey: "theme_mode")
         AppTheme.apply(mode, systemDark: UITraitCollection.current.userInterfaceStyle == .dark)
@@ -258,56 +232,29 @@ struct SettingsView: View {
     }
 }
 
-struct ThemeModeRow: View {
-    let title: String
-    let mode: String
-    let action: () -> Void
-
-    private var isSelected: Bool {
-        (UserDefaults.standard.string(forKey: "theme_mode") ?? "system") == mode
-    }
-
-    var body: some View {
-        Button(action: action) {
-            HStack(spacing: Spacing.md) {
-                Text(title)
-                    .font(.body)
-                    .foregroundColor(Theme.textPrimary)
-                Spacer()
-                if isSelected {
-                    Text("✓")
-                        .font(.body.weight(.semibold))
-                        .foregroundColor(Theme.primary)
-                }
-            }
-            .padding(Spacing.lg)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-    }
-}
-
-struct SettingRow: View {
+/// 设置行标签（SF Symbol + 标题 + 副标题）
+struct SettingsRowLabel: View {
     let icon: String
     let title: String
     let subtitle: String
-    let action: () -> Void
 
     var body: some View {
-        Button(action: action) {
-            HStack(spacing: 14) {
-                Text(icon).font(.body)
-                VStack(alignment: .leading) {
-                    Text(title).font(.body).foregroundColor(Theme.textPrimary)
-                    Text(subtitle).font(.caption).foregroundColor(Theme.textTertiary)
-                }
-                Spacer()
-                Image(systemName: "chevron.right").font(.caption).foregroundColor(Theme.textTertiary)
+        HStack(spacing: 14) {
+            Image(systemName: icon)
+                .font(.system(size: 17))
+                .frame(width: 24)
+                .foregroundColor(.secondary)
+            VStack(alignment: .leading, spacing: 1) {
+                Text(title)
+                    .font(.body)
+                    .foregroundColor(.primary)
+                Text(subtitle)
+                    .font(.caption)
+                    .foregroundColor(.secondary)
             }
-            .padding(Spacing.lg)
-            .contentShape(Rectangle())
         }
-        .buttonStyle(.plain)
-        Divider().overlay(Theme.surfaceHigh).padding(.leading, 56)
+        .padding(.vertical, 2)
     }
 }
+
+

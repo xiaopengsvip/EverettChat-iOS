@@ -8,9 +8,6 @@ struct DiscoverView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶栏（统一 PageTitleBar）
-            PageTitleBar(title: "发现")
-
             ScrollView {
                 VStack(spacing: 0) {
                     FeatureRow(icon: "gamecontroller", name: "游戏中心", desc: "game.vios.top · 原生打开") { showGame = true }

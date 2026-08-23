@@ -8,19 +8,12 @@ struct MessagesView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            // 顶栏（统一 PageTitleBar）
-            PageTitleBar(title: "消息") {
-                TitleBarButton(icon: "plus") {
-                    showAddSheet = true
-                }
-            }
+            // 搜索（系统搜索样式）
+            GlassSearchBar(text: $searchQuery, placeholder: "搜索消息")
+                .padding(.top, 8)
 
             ScrollView {
                 LazyVStack(spacing: 0) {
-                    // 消息搜索框（原生液态玻璃）
-                    GlassSearchBar(text: $searchQuery, placeholder: "搜索消息")
-
-                    // AI 助手固定置顶
                     ConversationRow(
                         icon: "sparkles",
                         name: "AI 助手",
