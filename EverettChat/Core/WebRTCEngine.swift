@@ -21,18 +21,29 @@ final class WebRTCEngine: NSObject, ObservableObject {
     private var conn: ConnectionManager { ConnectionManager.shared }
     private var videoEnabled = false
 
-    // STUN（公共）+ TURN（可配置，P2P 失败时兜底）
+    // STUN（公共）+ TURN（P2P 失败兜底）
     private var iceServers: [RTCIceServer] {
         var servers = [
             RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302"]),
             RTCIceServer(urlStrings: ["stun:stun1.l.google.com:19302"])
         ]
-        // TURN：部署 coturn 后填入（UserDefaults 可配置）
+        // 1) 用户自配 TURN（Cloudflare Calls / coturn）优先
         if let turnURL = UserDefaults.standard.string(forKey: "turn_url"),
            !turnURL.isEmpty {
             let user = UserDefaults.standard.string(forKey: "turn_user") ?? ""
             let pass = UserDefaults.standard.string(forKey: "turn_pass") ?? ""
             servers.append(RTCIceServer(urlStrings: [turnURL], username: user, credential: pass))
+        } else {
+            // 2) 免费公共 TURN 兜底（openrelay.metered.ca，公开凭据，有流量限制）
+            servers.append(RTCIceServer(
+                urlStrings: [
+                    "turn:openrelay.metered.ca:80",
+                    "turn:openrelay.metered.ca:443",
+                    "turns:openrelay.metered.ca:443?transport=tcp"
+                ],
+                username: "openrelayproject",
+                credential: "openrelayproject"
+            ))
         }
         return servers
     }
