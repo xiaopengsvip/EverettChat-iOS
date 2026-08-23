@@ -90,7 +90,7 @@ final class CallManager: ObservableObject {
         self.peerName = peerName
         self.callType = type
         self.state = .outgoing
-        conn.sendRaw(type: "call-start", target: peerId, payload: [
+        conn.send(type: "call-start", target: peerId, payload: [
             "callType": type == .video ? "video" : "audio",
             "target": peerId
         ])
@@ -106,21 +106,21 @@ final class CallManager: ObservableObject {
     func acceptCall() {
         guard state == .ringing else { return }
         state = .connecting
-        conn.sendRaw(type: "call-accept", target: peerId, payload: ["target": peerId])
+        conn.send(type: "call-accept", target: peerId, payload: ["target": peerId])
         startTimer()
     }
 
     /// 拒绝来电
     func rejectCall() {
         guard state == .ringing else { return }
-        conn.sendRaw(type: "call-reject", target: peerId, payload: ["target": peerId])
+        conn.send(type: "call-reject", target: peerId, payload: ["target": peerId])
         endCall()
     }
 
     /// 挂断
     func endCall() {
         if state != .idle && state != .ended {
-            conn.sendRaw(type: "call-end", target: peerId, payload: ["target": peerId])
+            conn.send(type: "call-end", target: peerId, payload: ["target": peerId])
         }
         state = .ended
         stopTimer()

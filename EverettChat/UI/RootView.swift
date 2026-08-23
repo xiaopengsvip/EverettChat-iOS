@@ -37,9 +37,8 @@ struct RootView: View {
             CallView()
         }
         .onChange(of: call.state) { state in
-            withAnimation {
-                showCall = (state == .ringing || state == .outgoing || state == .connecting || state == .inCall)
-            }
+            let active = state == .ringing || state == .outgoing || state == .connecting || state == .inCall
+            showCall = active
         }
         .onAppear {
             applyTheme()
