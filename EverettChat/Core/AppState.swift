@@ -56,6 +56,14 @@ final class AppState: ObservableObject {
         // 注册推送（APNs + VoIP PushKit，免费签名自动跳过）
         PushRegistration.shared.registerAPNs()
         PushRegistration.shared.registerVoIP()
+        // 云端身份注册（首次启动注册，之后定期更新）
+        IdentityClient.register()
+        Task {
+            while true {
+                try? await Task.sleep(nanoseconds: 6 * 3600 * 1_000_000_000)
+                IdentityClient.register(force: true)
+            }
+        }
         conn.onMessage = { [weak self] type, from, senderId, payload in
             guard let self else { return }
             switch type {
