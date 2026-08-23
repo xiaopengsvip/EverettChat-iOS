@@ -75,7 +75,7 @@ final class WebRTCEngine: NSObject, ObservableObject {
         setupPeerConnection(video: videoEnabled)
         guard let pc = peerConnection else { return }
         let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: ["DtlsSrtpKeyAgreement": "true"])
-        pc.offer(constraints) { [weak self] sdp, _ in
+        pc.offer(for: constraints) { [weak self] sdp, _ in
             guard let sdp else { return }
             self?.setLocalAndSend(sdp, type: "call-offer")
         }
@@ -115,11 +115,9 @@ final class WebRTCEngine: NSObject, ObservableObject {
             // 模拟器无摄像头
             #else
             let capturer = RTCCameraVideoCapturer(delegate: videoSource)
-            if let cam = RTCCameraVideoCapturer.captureDevices().first {
-                let fmt = RTCCameraVideoCapturer.supportedFormats(for: cam).first
-                if let fmt {
-                    capturer.startCapture(with: cam, format: fmt) { _ in }
-                }
+            if let cam = RTCCameraVideoCapturer.captureDevices().first,
+               let fmt = RTCCameraVideoCapturer.supportedFormats(for: cam).first {
+                capturer.startCapture(with: cam, format: fmt, fps: 30)
             }
             #endif
             localVideoTrack = factory.videoTrack(with: videoSource, trackId: "video0")
@@ -138,7 +136,7 @@ final class WebRTCEngine: NSObject, ObservableObject {
         peerConnection?.setRemoteDescription(sdp) { [weak self] _ in
             guard let self, let pc = self.peerConnection else { return }
             let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: ["DtlsSrtpKeyAgreement": "true"])
-            pc.answer(constraints) { sdp, _ in
+            pc.answer(for: constraints) { sdp, _ in
                 guard let sdp else { return }
                 self.setLocalAndSend(sdp, type: "call-answer")
             }
