@@ -113,11 +113,23 @@ jobs:
 
       - name: 安装 Android SDK + API ${{ matrix.api-level }} 镜像
         run: |
-          sdkmanager --install "platforms;android-${{ matrix.api-level }}" "build-tools;37.0.0" "platform-tools" "emulator" > /dev/null 2>&1 || true
-          sdkmanager --install "system-images;android-${{ matrix.api-level }};google_apis;x86_64" > /dev/null 2>&1 || \
-            sdkmanager --install "system-images;android-${{ matrix.api-level }};default;x86_64" > /dev/null 2>&1 || true
-          echo "no" | avdmanager create avd -n test -k "system-images;android-${{ matrix.api-level }};google_apis;x86_64" --force || \
-            echo "no" | avdmanager create avd -n test -k "system-images;android-${{ matrix.api-level }};default;x86_64" --force
+          export ANDROID_HOME="${ANDROID_HOME:-$ANDROID_SDK_ROOT}"
+          SDKMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          if [ ! -f "$SDKMANAGER" ]; then
+            SDKMANAGER=$(find "$ANDROID_HOME" -name sdkmanager 2>/dev/null | head -1)
+          fi
+          AVDMANAGER="$ANDROID_HOME/cmdline-tools/latest/bin/avdmanager"
+          if [ ! -f "$AVDMANAGER" ]; then
+            AVDMANAGER=$(find "$ANDROID_HOME" -name avdmanager 2>/dev/null | head -1)
+          fi
+          echo "sdkmanager: $SDKMANAGER"
+          echo "avdmanager: $AVDMANAGER"
+          yes | "$SDKMANAGER" --licenses > /dev/null 2>&1 || true
+          yes | "$SDKMANAGER" --install "platforms;android-${{ matrix.api-level }}" "build-tools;37.0.0" "platform-tools" "emulator" 2>&1 | tail -3 || true
+          yes | "$SDKMANAGER" --install "system-images;android-${{ matrix.api-level }};google_apis;x86_64" 2>&1 | tail -3 || \
+            yes | "$SDKMANAGER" --install "system-images;android-${{ matrix.api-level }};default;x86_64" 2>&1 | tail -3 || true
+          echo "no" | "$AVDMANAGER" create avd -n test -k "system-images;android-${{ matrix.api-level }};google_apis;x86_64" --force || \
+            echo "no" | "$AVDMANAGER" create avd -n test -k "system-images;android-${{ matrix.api-level }};default;x86_64" --force
 
       - name: 启动模拟器
         run: |
