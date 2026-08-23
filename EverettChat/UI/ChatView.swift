@@ -58,8 +58,27 @@ struct ChatView: View {
     private let apiClient = ChatApiClient()
     @StateObject private var deviceStore = DeviceLinkStore.shared
 
+    // 连接状态条（重连成功时显示 2 秒）
+    @State private var showConnBanner = false
+    @State private var prevConnected = false
+
     var body: some View {
         VStack(spacing: 0) {
+            // ===== 连接状态条（重连提示，非消息） =====
+            if showConnBanner && !isAI {
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.shield")
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.primary)
+                    Text("已重新连接 · 端到端加密")
+                        .font(.caption)
+                        .foregroundColor(Theme.primary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .background(Theme.primaryDim)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
             // 顶栏：返回 + 居中标题 + 副标题（模型名/ID）+ ℹ️
             ZStack {
                 // 居中标题
@@ -386,6 +405,16 @@ struct ChatView: View {
             if !isAI && !isDevice, let last = newValue.last, last.senderId == appState.chatPeerId {
                 EvoActivityManager.shared.updateChat(message: last.text, senderName: last.senderName.isEmpty ? "好友" : last.senderName)
             }
+        }
+        // 连接状态监听：重连成功时显示 2 秒提示条
+        .onReceive(appState.conn.$isConnected) { connected in
+            if !isAI && connected && !prevConnected {
+                withAnimation(.easeInOut(duration: 0.3)) { showConnBanner = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    withAnimation(.easeInOut(duration: 0.3)) { showConnBanner = false }
+                }
+            }
+            prevConnected = connected
         }
         .onChange(of: messages) { newValue in
             if isAI { appState.aiMessages = newValue }
