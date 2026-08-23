@@ -55,7 +55,14 @@ enum CryptoEngine {
         do {
             let nonce = AES.GCM.Nonce()   // 12B 随机
             let sealed = try AES.GCM.seal(Data(plaintext.utf8), using: key, nonce: nonce)
-            return (nonce.data, sealed.ciphertext + sealed.tag)
+            // nonce → Data
+            var nonceData = Data(count: nonce.byteCount)
+            nonceData.withUnsafeMutableBytes { noncePtr in
+                nonce.withUnsafeBytes { src in
+                    noncePtr.copyMemory(from: src)
+                }
+            }
+            return (nonceData, sealed.ciphertext + sealed.tag)
         } catch {
             return nil
         }
