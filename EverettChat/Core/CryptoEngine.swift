@@ -146,7 +146,7 @@ enum CryptoEngine {
 
     /// 编码 ML-KEM 封装公钥为 Base64
     static func mlkemPubKeyToB64(_ encap: EncapsulationKey) -> String {
-        Data(encap.encoded).base64EncodedString()
+        Data(encap.keyBytes).base64EncodedString()
     }
 
     /// 从 Base64 解码 ML-KEM 封装公钥
