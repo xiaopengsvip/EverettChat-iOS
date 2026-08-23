@@ -1,10 +1,14 @@
 import SwiftUI
 
-/// 设备互联：连接本机 Hermes + 进入完整对话（复用 ChatView 全部能力：图片/文件/语音/附件）
+/// 设备互联：多设备管理
+/// 1. Hermes 设备（本机 AI，OpenAI 兼容 API）
+/// 2. 音频设备（蓝牙耳机/有线耳机/扬声器检测与切换）
+/// 3. BLE 设备扫描（智能硬件/外设）
 struct DeviceLinkView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @StateObject private var store = DeviceLinkStore.shared
+    @StateObject private var deviceMgr = DeviceManager.shared
     @State private var host = ""
     @State private var port = ""
     @State private var apiKey = ""
@@ -23,69 +27,75 @@ struct DeviceLinkView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("连接信息") {
-                    HStack {
-                        Text("地址")
+                // ============ 1. Hermes 设备 ============
+                Section {
+                    HStack(spacing: 14) {
+                        ZStack {
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(Theme.primary.opacity(0.15))
+                            Image(systemName: "desktopcomputer")
+                                .font(.system(size: 20))
+                                .foregroundColor(Theme.primary)
+                        }
+                        .frame(width: 42, height: 42)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Hermes 设备")
+                                .font(.body.weight(.semibold))
+                                .foregroundColor(.primary)
+                            Text(store.isConnected ? "已连接 · \(store.modelName)" : "本机 AI 助手（未连接）")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
                         Spacer()
-                        TextField("IP 地址", text: $host)
-                            .multilineTextAlignment(.trailing).foregroundColor(.secondary)
-                            .disabled(store.isConnected)
-                        Text(":").foregroundColor(.secondary)
-                        TextField("端口", text: $port)
-                            .frame(width: 60).multilineTextAlignment(.trailing).foregroundColor(.secondary)
-                            .disabled(store.isConnected)
+                        if store.isConnected {
+                            Label("在线", systemImage: "checkmark.circle.fill")
+                                .font(.caption2)
+                                .foregroundColor(.green)
+                        }
                     }
-                    HStack {
-                        Text("密钥")
-                        Spacer()
-                        TextField("API Key", text: $apiKey)
-                            .multilineTextAlignment(.trailing).foregroundColor(.secondary)
-                            .disabled(store.isConnected)
-                    }
-                    if !store.isConnected {
+                    .padding(.vertical, 2)
+                } header: {
+                    Text("AI 设备")
+                }
+
+                // Hermes 连接配置（未连接时显示）
+                if !store.isConnected {
+                    Section("连接 Hermes") {
+                        HStack {
+                            Text("地址")
+                            Spacer()
+                            TextField("IP 地址", text: $host)
+                                .multilineTextAlignment(.trailing).foregroundColor(.secondary)
+                            Text(":").foregroundColor(.secondary)
+                            TextField("端口", text: $port)
+                                .frame(width: 60).multilineTextAlignment(.trailing).foregroundColor(.secondary)
+                        }
+                        HStack {
+                            Text("密钥")
+                            Spacer()
+                            TextField("API Key", text: $apiKey)
+                                .multilineTextAlignment(.trailing).foregroundColor(.secondary)
+                        }
                         HStack(spacing: 8) {
                             Text("快捷")
                             Spacer()
                             Button("局域网 172.11.8.35") { host = "172.11.8.35" }
                                 .buttonStyle(.bordered).controlSize(.small)
-                            Button("Tailscale 100.101.164.60") { host = "100.101.164.60" }
+                            Button("Tailscale") { host = "100.101.164.60" }
                                 .buttonStyle(.bordered).controlSize(.small)
                         }
-                        Text("同一 Wi-Fi 用局域网；异地 / VPN 用 Tailscale")
-                            .font(.caption2).foregroundColor(.secondary)
-                    }
-                    if store.isConnected {
-                        HStack {
-                            Text("状态")
-                            Spacer()
-                            Label("已连接", systemImage: "checkmark.circle.fill")
-                                .foregroundColor(.green).font(.caption)
-                        }
-                        if !store.modelName.isEmpty {
+                        Button(action: connect) {
                             HStack {
-                                Text("模型")
                                 Spacer()
-                                Text(store.modelName).font(.caption.monospaced()).foregroundColor(.secondary)
+                                if connecting { ProgressView().scaleEffect(0.8) }
+                                else { Label("连接设备", systemImage: "link") }
+                                Spacer()
                             }
+                            .foregroundColor(Theme.primary)
                         }
+                        .disabled(connecting || host.isEmpty)
                     }
-                }
-
-                Section {
-                    Button(action: store.isConnected ? disconnect : connect) {
-                        HStack {
-                            Spacer()
-                            if connecting { ProgressView().scaleEffect(0.8) }
-                            else { Label(store.isConnected ? "断开连接" : "连接设备",
-                                         systemImage: store.isConnected ? "minus.circle" : "link") }
-                            Spacer()
-                        }
-                        .foregroundColor(store.isConnected ? .red : Theme.primary)
-                    }
-                    .disabled(connecting || host.isEmpty)
-                }
-
-                if store.isConnected {
+                } else {
                     Section {
                         Button {
                             appState.openDeviceChat()
@@ -93,20 +103,145 @@ struct DeviceLinkView: View {
                         } label: {
                             HStack {
                                 Spacer()
-                                Label("进入对话", systemImage: "bubble.left.and.bubble.right")
+                                Label("进入 Hermes 对话", systemImage: "bubble.left.and.bubble.right")
                                     .font(.body.weight(.semibold))
                                 Spacer()
                             }
                             .foregroundColor(.white)
                             .padding(.vertical, 8)
-                            .padding(.horizontal, 20)
                             .background(Theme.primary)
                             .clipShape(RoundedRectangle(cornerRadius: 12))
                         }
                         .buttonStyle(.plain)
                         .listRowBackground(Color.clear)
                         .listRowInsets(EdgeInsets())
+
+                        Button(role: .destructive) {
+                            disconnect()
+                        } label: {
+                            Label("断开 Hermes", systemImage: "minus.circle")
+                                .foregroundColor(.red)
+                        }
                     }
+                }
+
+                // ============ 2. 音频设备（蓝牙耳机） ============
+                Section {
+                    if deviceMgr.audioOutputs.isEmpty {
+                        HStack {
+                            Image(systemName: "speaker.wave.2")
+                                .foregroundColor(.secondary)
+                            Text("未检测到音频输出")
+                                .font(.caption).foregroundColor(.secondary)
+                        }
+                    } else {
+                        ForEach(deviceMgr.audioOutputs) { dev in
+                            HStack(spacing: 12) {
+                                Image(systemName: dev.icon)
+                                    .font(.system(size: 18))
+                                    .foregroundColor(dev.isBluetooth ? Theme.primary : .secondary)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(dev.name)
+                                        .font(.body)
+                                        .foregroundColor(.primary)
+                                    Text(dev.typeLabel)
+                                        .font(.caption)
+                                        .foregroundColor(.secondary)
+                                }
+                                Spacer()
+                                if dev.isBluetooth {
+                                    Label("蓝牙", systemImage: "wave.3.right")
+                                        .font(.caption2)
+                                        .foregroundColor(Theme.primary)
+                                }
+                            }
+                        }
+                    }
+                    // 强制扬声器切换
+                    if !deviceMgr.audioOutputs.isEmpty {
+                        Button {
+                            deviceMgr.routeToSpeaker(true)
+                        } label: {
+                            Label("切换到扬声器播放", systemImage: "speaker.wave.2.fill")
+                        }
+                    }
+                } header: {
+                    Text("音频设备")
+                } footer: {
+                    Text("检测蓝牙耳机/有线耳机连接，切换播放输出。插拔耳机实时刷新。")
+                }
+
+                // 跳转系统蓝牙设置
+                Section {
+                    Button {
+                        openBluetoothSettings()
+                    } label: {
+                        Label("打开系统蓝牙设置", systemImage: "gear")
+                    }
+                }
+
+                // ============ 3. BLE 设备扫描 ============
+                Section {
+                    if !deviceMgr.blePoweredOn {
+                        HStack(spacing: 8) {
+                            Image(systemName: "exclamationmark.triangle")
+                                .foregroundColor(.orange)
+                            Text("蓝牙未开启，请先在系统设置中打开蓝牙")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    Button {
+                        deviceMgr.isScanning ? deviceMgr.stopScan() : deviceMgr.startScan()
+                    } label: {
+                        Label(deviceMgr.isScanning ? "停止扫描" : "扫描附近 BLE 设备",
+                              systemImage: deviceMgr.isScanning ? "stop.circle" : "antenna.radiowaves.left.and.right")
+                    }
+
+                    if deviceMgr.isScanning {
+                        HStack(spacing: 8) {
+                            ProgressView().scaleEffect(0.7)
+                            Text("扫描中...")
+                                .font(.caption).foregroundColor(.secondary)
+                        }
+                    }
+
+                    if deviceMgr.bleDevices.isEmpty && !deviceMgr.isScanning {
+                        Text("未发现设备，点击扫描开始搜索附近的蓝牙设备")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+
+                    ForEach(deviceMgr.bleDevices) { dev in
+                        HStack(spacing: 12) {
+                            Image(systemName: dev.isConnected ? "iphone.radiowaves.left.and.right" : "antenna.radiowaves.left.and.right")
+                                .font(.system(size: 16))
+                                .foregroundColor(dev.isConnected ? .green : .secondary)
+                            VStack(alignment: .leading, spacing: 1) {
+                                Text(dev.name)
+                                    .font(.body)
+                                    .foregroundColor(.primary)
+                                if !dev.serviceUUIDs.isEmpty {
+                                    Text(dev.serviceUUIDs.prefix(2).joined(separator: " · "))
+                                        .font(.caption2)
+                                        .foregroundColor(.secondary)
+                                }
+                            }
+                            Spacer()
+                            VStack(alignment: .trailing, spacing: 1) {
+                                Text("\(dev.rssi) dBm")
+                                    .font(.caption.monospacedDigit())
+                                    .foregroundColor(.secondary)
+                                if dev.isConnected {
+                                    Text("已连接").font(.caption2).foregroundColor(.green)
+                                }
+                            }
+                        }
+                    }
+                } header: {
+                    Text("蓝牙设备")
+                } footer: {
+                    Text("扫描附近的 BLE 智能设备（支持自定义外设后续扩展）。系统蓝牙耳机由上方「音频设备」管理。")
                 }
 
                 if !statusText.isEmpty {
@@ -127,10 +262,18 @@ struct DeviceLinkView: View {
             }
             .onAppear {
                 host = store.host; port = store.port; apiKey = store.apiKey
+                deviceMgr.refreshAudioRoute()
             }
             .onDisappear {
                 store.host = host; store.port = port; store.apiKey = apiKey; store.save()
+                deviceMgr.stopScan()
             }
+        }
+    }
+
+    private func openBluetoothSettings() {
+        if let url = URL(string: UIApplication.openSettingsURLString) {
+            UIApplication.shared.open(url)
         }
     }
 
