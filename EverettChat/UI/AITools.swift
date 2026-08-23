@@ -57,6 +57,22 @@ func extractToolCards(from text: String) -> [(card: AIToolCard, code: String?)] 
     return cards
 }
 
+/// 提取消息中的第一个 URL（用于链接卡片显示）
+func extractFirstURL(from text: String) -> String? {
+    let pattern = #"(?:https?://)?(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}(?:[/?#][^\s<>"']*)?"#
+    guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+    let nsRange = NSRange(text.startIndex..<text.endIndex, in: text)
+    guard let match = regex.firstMatch(in: text, range: nsRange),
+          let range = Range(match.range, in: text) else { return nil }
+    let raw = String(text[range])
+    // 排除纯文本中的小数点/句号结尾
+    var cleaned = raw
+    while cleaned.hasSuffix(".") || cleaned.hasSuffix(",") || cleaned.hasSuffix("。") {
+        cleaned.removeLast()
+    }
+    return cleaned.hasPrefix("http://") || cleaned.hasPrefix("https://") ? cleaned : "https://" + cleaned
+}
+
 // MARK: - 时间/日历卡片
 
 /// 实时时钟 + 年月日（Liquid Glass 风格）

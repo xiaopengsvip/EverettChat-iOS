@@ -11,6 +11,7 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     var voiceDurationMs: Double = 0
     var videoBase64: String = ""
     var videoDurationMs: Double = 0
+    var hasOriginal: Bool = false   // 图片是否原图（未压缩）
     var reasoning: String = ""
     var senderName: String = ""
     var senderId: String = ""
@@ -18,7 +19,7 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     var status: String = "sent"   // sent | delivered | failed
     var createdAt: Date = Date()
 
-    init(id: String = UUID().uuidString, role: String, text: String, imageBase64: String = "", voiceBase64: String = "", voiceDurationMs: Double = 0, videoBase64: String = "", videoDurationMs: Double = 0, reasoning: String = "",
+    init(id: String = UUID().uuidString, role: String, text: String, imageBase64: String = "", voiceBase64: String = "", voiceDurationMs: Double = 0, videoBase64: String = "", videoDurationMs: Double = 0, hasOriginal: Bool = false, reasoning: String = "",
          senderName: String = "", senderId: String = "", isError: Bool = false, status: String = "sent") {
         self.id = id
         self.role = role
@@ -28,6 +29,7 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         self.voiceDurationMs = voiceDurationMs
         self.videoBase64 = videoBase64
         self.videoDurationMs = videoDurationMs
+        self.hasOriginal = hasOriginal
         self.reasoning = reasoning
         self.senderName = senderName
         self.senderId = senderId
@@ -36,7 +38,7 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, role, text, imageBase64, voiceBase64, voiceDurationMs, videoBase64, videoDurationMs, reasoning, senderName, senderId, isError, status, createdAt
+        case id, role, text, imageBase64, voiceBase64, voiceDurationMs, videoBase64, videoDurationMs, hasOriginal, reasoning, senderName, senderId, isError, status, createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -49,6 +51,7 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         voiceDurationMs = try container.decodeIfPresent(Double.self, forKey: .voiceDurationMs) ?? 0
         videoBase64 = try container.decodeIfPresent(String.self, forKey: .videoBase64) ?? ""
         videoDurationMs = try container.decodeIfPresent(Double.self, forKey: .videoDurationMs) ?? 0
+        hasOriginal = try container.decodeIfPresent(Bool.self, forKey: .hasOriginal) ?? false
         reasoning = try container.decodeIfPresent(String.self, forKey: .reasoning) ?? ""
         senderName = try container.decodeIfPresent(String.self, forKey: .senderName) ?? ""
         senderId = try container.decodeIfPresent(String.self, forKey: .senderId) ?? ""

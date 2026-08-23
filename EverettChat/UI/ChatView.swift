@@ -49,6 +49,9 @@ struct ChatView: View {
     // 图片全屏预览 / 视频播放
     @State private var fullscreenImage: UIImage? = nil
     @State private var videoToPlay: String? = nil
+    // 待发送图片（压缩/原图选择）
+    @State private var pendingImageData: Data? = nil
+    @State private var showImageQualityPicker = false
 
     private var isAI: Bool { appState.chatMode == "ai" }
     private let apiClient = ChatApiClient()
@@ -114,6 +117,7 @@ struct ChatView: View {
                 onResend: resend,
                 onImageTap: { img in fullscreenImage = img },
                 onVideoTap: { b64 in videoToPlay = b64 },
+                onOpenURL: { url in webURL = url },
                 onCountChange: { proxy in
                     withAnimation { proxy.scrollTo(messages.last?.id, anchor: .bottom) }
                 },
@@ -291,16 +295,31 @@ struct ChatView: View {
                         if type.conforms(to: .movie) || type.conforms(to: .video) {
                             sendVideoData(data)
                         } else if type.conforms(to: .image) {
-                            sendImageData(data)
+                            // 图片：弹压缩/原图选择
+                            pendingImageData = data
+                            showImageQualityPicker = true
                         } else {
                             sendFile(name: "媒体_\(Date().timeIntervalSince1970)", data: data)
                         }
                     } else {
-                        sendImageData(data)
+                        pendingImageData = data
+                        showImageQualityPicker = true
                     }
                 }
                 pickerItem = nil
             }
+        }
+        // 图片质量选择（压缩/原图）
+        .confirmationDialog("发送图片", isPresented: $showImageQualityPicker, titleVisibility: .visible) {
+            Button("压缩发送（推荐，更快）") {
+                if let data = pendingImageData { sendImageData(data, original: false) }
+                pendingImageData = nil
+            }
+            Button("原图发送（不压缩）") {
+                if let data = pendingImageData { sendImageData(data, original: true) }
+                pendingImageData = nil
+            }
+            Button("取消", role: .cancel) { pendingImageData = nil }
         }
         // 消息内链接 → 应用内浏览器（不跳出 Safari）
         .environment(\.openURL, OpenURLAction { url in
@@ -576,18 +595,23 @@ struct ChatView: View {
         playingVoiceId = nil
     }
 
-    /// 发送图片数据（压缩到 1280px）
-    private func sendImageData(_ data: Data) {
+    /// 发送图片数据（默认压缩 1280px；original=true 发原图）
+    private func sendImageData(_ data: Data, original: Bool = false) {
         guard let img = UIImage(data: data) else { return }
-        let resized = img.resized(maxSide: 1280)
-        let jpeg = resized.jpegData(compressionQuality: 0.8) ?? data
-        let b64 = jpeg.base64EncodedString()
+        var b64: String
+        if original {
+            // 原图：不压缩
+            b64 = data.base64EncodedString()
+        } else {
+            let resized = img.resized(maxSide: 1280)
+            b64 = (resized.jpegData(compressionQuality: 0.8) ?? data).base64EncodedString()
+        }
         if isAI {
-            let msg = ChatMessage(role: "user", text: "", imageBase64: b64)
+            let msg = ChatMessage(role: "user", text: "", imageBase64: b64, hasOriginal: original)
             messages.append(msg)
             sendAI(text: "", imageBase64: b64)
         } else {
-            let msg = ChatMessage(role: "user", text: "", imageBase64: b64, senderName: DeviceIdentity.shared.deviceName)
+            let msg = ChatMessage(role: "user", text: "", imageBase64: b64, hasOriginal: original, senderName: DeviceIdentity.shared.deviceName)
             messages.append(msg)
             appState.conn.sendImage(base64: b64, target: appState.chatPeerId, messageId: msg.id)
         }
@@ -686,6 +710,7 @@ struct MessageBubble: View {
     var onCopy: (() -> Void)? = nil
     var onForward: (() -> Void)? = nil
     var onDelete: (() -> Void)? = nil
+    var onOpenURL: ((URL) -> Void)? = nil
 
     /// 送达状态图标（自己发的消息：✓ 已发送 / ✓✓ 已送达 / ! 失败）
     @ViewBuilder
@@ -725,7 +750,8 @@ struct MessageBubble: View {
          onStopVoice: @escaping () -> Void, avatarState: AvatarState = .idle,
          autoExpandReasoning: Bool = false, onResend: (() -> Void)? = nil,
          onImageTap: ((UIImage) -> Void)? = nil, onVideoTap: ((String) -> Void)? = nil,
-         onCopy: (() -> Void)? = nil, onForward: (() -> Void)? = nil, onDelete: (() -> Void)? = nil) {
+         onCopy: (() -> Void)? = nil, onForward: (() -> Void)? = nil, onDelete: (() -> Void)? = nil,
+         onOpenURL: ((URL) -> Void)? = nil) {
         self.msg = msg
         self.isMine = isMine
         self.isAI = isAI
@@ -741,6 +767,7 @@ struct MessageBubble: View {
         self.onCopy = onCopy
         self.onForward = onForward
         self.onDelete = onDelete
+        self.onOpenURL = onOpenURL
         // 流式中思考默认展开
         _isReasoningExpanded = State(initialValue: autoExpandReasoning)
     }
@@ -883,6 +910,17 @@ struct MessageBubble: View {
                                     .scaledToFit()
                                     .frame(maxWidth: 240)
                                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .overlay(alignment: .bottomTrailing) {
+                                        if msg.hasOriginal {
+                                            Text("原图")
+                                                .font(.system(size: 8, weight: .semibold))
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 5)
+                                                .padding(.vertical, 2)
+                                                .background(Capsule().fill(Color.black.opacity(0.6)))
+                                                .padding(4)
+                                        }
+                                    }
                             }
                             .buttonStyle(.plain)
                         }
@@ -905,6 +943,14 @@ struct MessageBubble: View {
                             .font(.system(size: 9))
                             .foregroundColor(Theme.textTertiary)
                             .padding(.top, 1)
+                        // URL 链接卡片（标题 + 封面预览）
+                        if !msg.text.isEmpty, msg.imageBase64.isEmpty, msg.videoBase64.isEmpty, msg.voiceBase64.isEmpty,
+                           let urlString = extractFirstURL(from: msg.text) {
+                            URLCardView(urlString: urlString) { url in
+                                onOpenURL?(url)
+                            }
+                        }
+
                         // 工具卡片（时间/日历/天气/定位/代码运行）——所有消息都支持
                         if !msg.text.isEmpty {
                             let cards = extractToolCards(from: msg.text)
@@ -912,6 +958,13 @@ struct MessageBubble: View {
                                 ForEach(Array(cards.enumerated()), id: \.offset) { _, item in
                                     AIToolCardView(card: item.card, code: item.code)
                                 }
+                            }
+                        }
+                        // URL 链接卡片（标题 + 封面预览）
+                        if !msg.text.isEmpty, msg.imageBase64.isEmpty, msg.videoBase64.isEmpty, msg.voiceBase64.isEmpty,
+                           let urlString = extractFirstURL(from: msg.text) {
+                            URLCardView(urlString: urlString) { url in
+                                onOpenURL?(url)
                             }
                         }
                     }
@@ -933,6 +986,17 @@ struct MessageBubble: View {
                                     .scaledToFit()
                                     .frame(maxWidth: 240)
                                     .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                                    .overlay(alignment: .bottomTrailing) {
+                                        if msg.hasOriginal {
+                                            Text("原图")
+                                                .font(.system(size: 8, weight: .semibold))
+                                                .foregroundColor(.white)
+                                                .padding(.horizontal, 5)
+                                                .padding(.vertical, 2)
+                                                .background(Capsule().fill(Color.black.opacity(0.6)))
+                                                .padding(4)
+                                        }
+                                    }
                             }
                             .buttonStyle(.plain)
                         }
@@ -1529,6 +1593,7 @@ struct MessageListView: View {
     let onResend: ((ChatMessage) -> Void)?
     let onImageTap: ((UIImage) -> Void)?
     let onVideoTap: ((String) -> Void)?
+    let onOpenURL: ((URL) -> Void)?
     let onCountChange: (ScrollViewProxy) -> Void
     let onStreamChange: (ScrollViewProxy) -> Void
 
@@ -1556,7 +1621,8 @@ struct MessageListView: View {
                             onVideoTap: onVideoTap,
                             onCopy: { onCopy(msg) },
                             onForward: { onForward(msg) },
-                            onDelete: { onDelete(msg) }
+                            onDelete: { onDelete(msg) },
+                            onOpenURL: onOpenURL
                         )
                         .id(msg.id)
                         .contextMenu {
