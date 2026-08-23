@@ -622,7 +622,7 @@ struct MessageBubble: View {
                                 .cornerRadius(12)
                         }
                         if !msg.text.isEmpty {
-                            Text(linkified(msg.text))
+                            Text(renderRichText(msg.text))
                                 .font(.body)
                                 .foregroundColor(Theme.textPrimary)
                                 .textSelection(.enabled)
@@ -665,7 +665,7 @@ struct MessageBubble: View {
                             }
                         }
                         if !msg.text.isEmpty {
-                            Text(linkified(msg.text))
+                            Text(renderRichText(msg.text))
                                 .font(.body)
                                 .foregroundColor(isMine ? .white : Theme.textPrimary)
                                 .textSelection(.enabled)

@@ -16,6 +16,16 @@ extension URL: Identifiable {
     public var id: String { absoluteString }
 }
 
+/// 富文本渲染：优先 Markdown 解析（粗体/斜体/代码/链接），失败回退到链接化
+func renderRichText(_ text: String) -> AttributedString {
+    // iOS 内置 Markdown 解析（支持 **粗体** *斜体*  [链接](url) ~~删除线~~）
+    if let md = try? AttributedString(markdown: text, options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)) {
+        return md
+    }
+    // Markdown 解析失败（如特殊字符冲突）→ 回退到纯文本链接检测
+    return linkified(text)
+}
+
 /// 消息文本链接化：检测 URL（含无前缀域名）生成可点击的 AttributedString
 func linkified(_ text: String) -> AttributedString {
     var attributed = AttributedString(text)
