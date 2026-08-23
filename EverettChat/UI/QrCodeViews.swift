@@ -89,26 +89,54 @@ struct MyQrCodeView: View {
     }
 }
 
-/// 二维码扫描（相机 + 相册）
+/// 二维码扫描（相机 + 相册 + 我的二维码 + 手电筒补光）
 struct QrScannerView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.dismiss) private var dismiss
     @State private var isScanning = true
     @State private var scanResult: String? = nil
     @State private var pickerItem: PhotosPickerItem?
+    @State private var scanLineOffset: CGFloat = -110
+    @State private var showMyQr = false
+    @State private var torchOn = false
+    @State private var lowLight = false
 
     var body: some View {
         ZStack {
-            CameraPreview(isScanning: $isScanning) { code in
+            CameraPreview(isScanning: $isScanning, torchOn: $torchOn, lowLight: $lowLight) { code in
                 scanResult = code
                 isScanning = false
             }
             .ignoresSafeArea()
 
-            // 取景框
-            RoundedRectangle(cornerRadius: Radius.large)
-                .stroke(Theme.primary, lineWidth: 2)
-                .frame(width: 260, height: 260)
+            // 暗光遮罩（弱光提示）
+            if lowLight {
+                Color.black.opacity(0.15).ignoresSafeArea()
+            }
+
+            // 取景框 + 四角
+            ZStack {
+                RoundedRectangle(cornerRadius: Radius.large)
+                    .stroke(Theme.primary, lineWidth: 2)
+                    .frame(width: 260, height: 260)
+                // 扫描线动画
+                Rectangle()
+                    .fill(LinearGradient(colors: [.clear, Theme.primary.opacity(0.8), .clear], startPoint: .top, endPoint: .bottom))
+                    .frame(width: 240, height: 3)
+                    .offset(y: scanLineOffset)
+                    .onAppear {
+                        withAnimation(.easeInOut(duration: 1.6).repeatForever(autoreverses: true)) {
+                            scanLineOffset = 110
+                        }
+                    }
+                // 四角标记
+                ForEach([(x: -1, y: -1), (x: 1, y: -1), (x: -1, y: 1), (x: 1, y: 1)], id: \.x) { corner in
+                    RoundedRectangle(cornerRadius: 6)
+                        .stroke(Theme.primary, lineWidth: 4)
+                        .frame(width: 26, height: 26)
+                        .offset(x: CGFloat(corner.x) * 130, y: CGFloat(corner.y) * 130)
+                }
+            }
 
             VStack {
                 HStack {
@@ -120,21 +148,48 @@ struct QrScannerView: View {
                     .padding()
                 }
                 Spacer()
-                // 底部：相机扫码 + 相册扫码（异地：对方发来的二维码图片）
+                // 底部：我的二维码 + 相册扫码 + 手电筒
                 HStack(spacing: 20) {
-                    Text("扫描好友二维码")
-                        .font(.subheadline)
-                        .foregroundColor(.white)
-                    PhotosPicker(selection: $pickerItem, matching: .images) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "photo.on.rectangle")
-                            Text("相册").font(.subheadline)
+                    // 我的二维码
+                    Button {
+                        showMyQr = true
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: "qrcode")
+                            Text("我的二维码").font(.caption2)
                         }
                         .foregroundColor(.white)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 8)
                         .background(.black.opacity(0.5))
-                        .cornerRadius(20)
+                        .cornerRadius(16)
+                    }
+
+                    // 手电筒补光（暗光提醒）
+                    Button {
+                        torchOn.toggle()
+                    } label: {
+                        VStack(spacing: 4) {
+                            Image(systemName: torchOn ? "flashlight.on.fill" : "flashlight.off.fill")
+                            Text("手电筒").font(.caption2)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(torchOn ? Theme.primary.opacity(0.8) : .black.opacity(0.5))
+                        .cornerRadius(16)
+                    }
+
+                    PhotosPicker(selection: $pickerItem, matching: .images) {
+                        VStack(spacing: 4) {
+                            Image(systemName: "photo.on.rectangle")
+                            Text("相册").font(.caption2)
+                        }
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 14)
+                        .padding(.vertical, 8)
+                        .background(.black.opacity(0.5))
+                        .cornerRadius(16)
                     }
                     .onChange(of: pickerItem) { item in
                         guard let item else { return }
@@ -151,10 +206,24 @@ struct QrScannerView: View {
                         }
                     }
                 }
+                // 暗光提示条
+                if lowLight {
+                    Text("环境光线较暗，建议打开手电筒补光")
+                        .font(.caption)
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 8)
+                        .background(Capsule().fill(.black.opacity(0.6)))
+                        .padding(.bottom, 6)
+                        .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
                 .padding(.vertical, 12)
                 .frame(maxWidth: .infinity)
-                .background(.black.opacity(0.5))
+                .background(.black.opacity(0.4))
             }
+        }
+        .fullScreenCover(isPresented: $showMyQr) {
+            MyQrCodeView()
         }
         .onChange(of: scanResult) { code in
             guard let code else { return }
@@ -187,35 +256,53 @@ struct QrScannerView: View {
     }
 }
 
-/// 相机预览 + 二维码识别
+/// 相机预览 + 二维码识别 + 手电筒 + 光线检测
 struct CameraPreview: UIViewControllerRepresentable {
     @Binding var isScanning: Bool
+    @Binding var torchOn: Bool
+    @Binding var lowLight: Bool
     let onDetect: (String) -> Void
 
     func makeUIViewController(context: Context) -> CameraViewController {
         let vc = CameraViewController()
         vc.onDetect = onDetect
+        vc.onTorchChange = { torchOn = $0 }
+        vc.onLowLightChange = { lowLight = $0 }
         return vc
     }
 
     func updateUIViewController(_ uiViewController: CameraViewController, context: Context) {
         uiViewController.isScanning = isScanning
+        uiViewController.setTorch(torchOn)
     }
 }
 
 final class CameraViewController: UIViewController, AVCaptureMetadataOutputObjectsDelegate {
     var onDetect: ((String) -> Void)?
+    var onTorchChange: ((Bool) -> Void)?
+    var onLowLightChange: ((Bool) -> Void)?
     var isScanning = true
     private var captureSession: AVCaptureSession?
+    private var device: AVCaptureDevice?
+    private var lowLightTimer: Timer?
+    private var torch = false
 
     override func viewDidLoad() {
         super.viewDidLoad()
         setupCamera()
+        startLowLightMonitor()
+    }
+
+    override func viewWillDisappear(_ animated: Bool) {
+        super.viewWillDisappear(animated)
+        lowLightTimer?.invalidate()
+        setTorch(false)
     }
 
     private func setupCamera() {
         guard let device = AVCaptureDevice.default(for: .video),
               let input = try? AVCaptureDeviceInput(device: device) else { return }
+        self.device = device
         let session = AVCaptureSession()
         let output = AVCaptureMetadataOutput()
         session.addInput(input)
@@ -231,6 +318,27 @@ final class CameraViewController: UIViewController, AVCaptureMetadataOutputObjec
         captureSession = session
         DispatchQueue.global(qos: .userInitiated).async {
             session.startRunning()
+        }
+    }
+
+    /// 手电筒开关
+    func setTorch(_ on: Bool) {
+        torch = on
+        guard let device, device.hasTorch else { return }
+        do {
+            try device.lockForConfiguration()
+            device.torchMode = on ? .on : .off
+            device.unlockForConfiguration()
+        } catch {}
+    }
+
+    /// 光线监测：每 1.5s 读取亮度，< 0.15 判定暗光
+    private func startLowLightMonitor() {
+        lowLightTimer = Timer.scheduledTimer(withTimeInterval: 1.5, repeats: true) { [weak self] _ in
+            guard let self, let device = self.device else { return }
+            let level = device.exposureTargetBias > 0 ? 0.3 : (device.iso > 1000 ? 0.1 : 0.5)
+            let dark = level < 0.2
+            self.onLowLightChange?(dark)
         }
     }
 
