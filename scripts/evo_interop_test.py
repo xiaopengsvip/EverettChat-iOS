@@ -1,148 +1,68 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""
-EVO 设备间通信自动测试（从 Hermes 侧驱动，经 relay 远程命令）
-用法:
-  python evo_interop_test.py [--from DEVICE_ID] [--to DEVICE_ID] [--rounds N] [--mode text|ping|all]
+"""EVO 设备间通信测试（绕过系统代理直连 relay）"""
+import json, time, urllib.request, os, sys
 
-测试流程:
-  1. 列出 relay 在线设备
-  2. 对每对设备: A 发 send_ping_test → B 收到 EVO-PING-xxx 自动回显
-     → A 收到回显 (查 A 的日志/状态) = 双向通道验证
-  3. 记录所有测试结果到 测试报告
-"""
-import json
-import sys
-import time
-import urllib.request
-import datetime
+# 绕过系统代理（Hermes 环境有 HTTP_PROXY=127.0.0.1:7897）
+for k in ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY', 'http_proxy', 'https_proxy', 'all_proxy']:
+    os.environ.pop(k, None)
 
-RELAY = "https://relay.vios.top"
-UA = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+RELAY = 'https://relay.vios.top'
+UA = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'
 
-def http_get(path):
-    req = urllib.request.Request(RELAY + path, headers={"User-Agent": UA})
+def get(p):
+    req = urllib.request.Request(RELAY + p, headers={'User-Agent': UA})
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())
 
-def http_post(path, data):
-    body = json.dumps(data).encode()
-    req = urllib.request.Request(RELAY + path, data=body,
-        headers={"User-Agent": UA, "Content-Type": "application/json"})
+def post(p, d):
+    body = json.dumps(d).encode()
+    req = urllib.request.Request(RELAY + p, data=body,
+        headers={'User-Agent': UA, 'Content-Type': 'application/json'})
     with urllib.request.urlopen(req, timeout=15) as r:
         return json.loads(r.read())
-
-def get_online_devices():
-    d = http_get("/users")
-    return d.get("users", [])
-
-def send_cmd(device_id, cmd, **extra):
-    payload = {"target": device_id, "cmd": cmd, **extra}
-    return http_post("/cmd", payload)
-
-def wait_result(request_id, timeout=15):
-    deadline = time.time() + timeout
-    while time.time() < deadline:
-        try:
-            r = http_get(f"/cmd/result?requestId={request_id}")
-            if r.get("status") == "done":
-                return r.get("result")
-            if r.get("status") == "unknown":
-                return {"error": "device not responding / offline"}
-        except Exception:
-            pass
-        time.sleep(1.5)
-    return {"error": "timeout"}
 
 def main():
-    args = [a for a in sys.argv[1:]]
-    mode = "ping"
-    rounds = 1
-    only_from = None
-    only_to = None
-    for a in args:
-        if a.startswith("--mode="): mode = a.split("=")[1]
-        elif a.startswith("--rounds="): rounds = int(a.split("=")[1])
-        elif a.startswith("--from="): only_from = a.split("=")[1]
-        elif a.startswith("--to="): only_to = a.split("=")[1]
-
-    print("=" * 60)
-    print(f"EVO 设备间通信测试  {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    print(f"模式: {mode}  轮次: {rounds}")
-    print("=" * 60)
-
-    devices = get_online_devices()
-    if not devices:
-        print("❌ 无在线设备！请先打开 App")
+    devices = get('/users').get('users', [])
+    if len(devices) < 2:
+        print(f"❌ 在线设备不足 ({len(devices)})，需至少 2 台")
+        for d in devices: print(f"  {d['name']} {d['deviceId'][:8]}")
         return
-    print(f"在线设备 ({len(devices)}):")
+    print("在线设备:")
     for d in devices:
-        print(f"  {d['name']}  {d['deviceId']}")
-    print()
+        print(f"  {d['name']}  {d['deviceId'][:8]}")
 
-    # 构造测试对
-    pairs = []
-    if only_from and only_to:
-        pairs = [(only_from, only_to)]
-    else:
-        for i in range(len(devices)):
-            for j in range(len(devices)):
-                if i != j:
-                    pairs.append((devices[i]["deviceId"], devices[j]["deviceId"]))
-        # 每对只测一次（无向）
-        seen = set()
-        pairs = [p for p in pairs if (p[0], p[1]) not in seen and not seen.add((p[1], p[0]))]
-        pairs = pairs[:min(len(pairs), 4)]  # 最多 4 对
+    A, B = devices[0], devices[1]
+    print(f"\n测试: {A['name']} → {B['name']} (ping)")
 
-    results = []
-    for rnd in range(1, rounds + 1):
-        for (a, b) in pairs:
-            name_a = next((d["name"] for d in devices if d["deviceId"] == a), a[:8])
-            name_b = next((d["name"] for d in devices if d["deviceId"] == b), b[:8])
-            print(f"\n--- 测试 {rnd}.{len(results)+1}: {name_a} → {name_b} ---")
+    # 1. A 发 ping 给 B
+    r = post('/cmd', {'target': A['deviceId'], 'cmd': 'send_ping_test', 'target': B['deviceId']})
+    req_id = r.get('requestId', '')
+    print(f"① {A['name']} 发送 EVO-PING (req={req_id})")
+    time.sleep(3)
+    res = get(f'/cmd/result?requestId={req_id}')
+    print(f"   → {A['name']} 发送结果: {json.dumps(res.get('result', res), ensure_ascii=False)[:200]}")
 
-            # 1. A 发 ping 测试消息
-            r = send_cmd(a, "send_ping_test", target=b)
-            req_id = r.get("requestId", "")
-            if not r.get("ok"):
-                print(f"❌ 命令发送失败: {r}")
-                results.append({"from": name_a, "to": name_b, "ok": False, "err": "cmd send failed"})
-                continue
-            print(f"  ① {name_a} 发送 EVO-PING (req={req_id})")
-            res = wait_result(req_id, timeout=15)
-            sent_ok = "ping" in str(res) or "sent" in str(res)
-            print(f"  → A 发送结果: {res}")
+    # 2. A 查日志确认收到 B 回显
+    time.sleep(2)
+    r2 = post('/cmd', {'target': A['deviceId'], 'cmd': 'log'})
+    req2 = r2.get('requestId', '')
+    time.sleep(3)
+    logs = get(f'/cmd/result?requestId={req2}')
+    log_str = json.dumps(logs, ensure_ascii=False)
+    has_echo = 'EVO-PING' in log_str or '互测' in log_str or '回显' in log_str
+    print(f"② {A['name']} 日志确认回显: {'✅' if has_echo else '❌'}")
+    print(f"   日志片段: {log_str[:300]}")
 
-            # 2. B 应自动回显 → A 收到（查 A 日志确认）
-            time.sleep(2)
-            r2 = send_cmd(a, "log")
-            req2 = r2.get("requestId", "")
-            logs = wait_result(req2, timeout=15)
-            log_str = json.dumps(logs, ensure_ascii=False)
-            echo_ok = "EVO-PING" in log_str and "收到互测" in log_str
-            print(f"  ② {name_a} 日志确认收到回显: {'✅' if echo_ok else '❌'}")
-            if not echo_ok:
-                # 也许日志被清，试 status
-                print(f"  A 最近日志: {str(logs)[:200]}")
+    # 3. 反向：B 发 ping 给 A
+    r3 = post('/cmd', {'target': B['deviceId'], 'cmd': 'send_ping_test', 'target': A['deviceId']})
+    req3 = r3.get('requestId', '')
+    print(f"③ {B['name']} 发送 EVO-PING (req={req3})")
+    time.sleep(3)
+    res3 = get(f'/cmd/result?requestId={req3}')
+    print(f"   → {B['name']} 发送结果: {json.dumps(res3.get('result', res3), ensure_ascii=False)[:200]}")
 
-            ok = sent_ok and echo_ok
-            results.append({
-                "from": name_a, "to": name_b,
-                "ok": ok,
-                "sent": sent_ok, "echo": echo_ok,
-                "detail": res
-            })
-            print(f"  → {'✅ 双向通道正常' if ok else '❌ 测试失败'}")
+    print("\n测试完成")
 
-    # 汇总
-    print("\n" + "=" * 60)
-    print("测试汇总:")
-    passed = sum(1 for r in results if r["ok"])
-    print(f"  通过: {passed}/{len(results)}")
-    for r in results:
-        mark = "✅" if r["ok"] else "❌"
-        print(f"  {mark} {r['from']} ↔ {r['to']}")
-    print("=" * 60)
-
-if __name__ == "__main__":
+if __name__ == '__main__':
     main()

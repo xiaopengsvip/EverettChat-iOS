@@ -84,6 +84,32 @@ curl -X POST https://relay.vios.top/cmd -H "Content-Type: application/json" \
 | T6 | 离线补发 | 上线收到 |
 | T7 | 断网重连稳定性 | 重连后正常 |
 
+## APK 推送更新服务（Hermes → 所有安卓设备）
+
+### 用法
+```bash
+# 推送 APK 给所有在线安卓设备（自动弹"安装更新"框）
+python scripts/evo_push_apk.py "C:\Users\XIAO2027\Desktop\客户端\安卓\EVO-xxx.apk"
+
+# 定向推送
+python scripts/evo_push_apk.py "xxx.apk" --target <设备ID>
+```
+
+### 实现原理
+1. **Hermes 端**：读 APK → 计算房间密钥（PBKDF2-100k，与设备端 E2Ev1 一致）→ 加密 FileMeta（AES-256-GCM）
+2. **上传**：POST /upload?room=everett-public&fileId=xxx（二进制，60MB 直传）
+3. **广播**：POST /apk/broadcast {fileId, encMeta, nonce, salt} → relay 推给所有在线设备
+4. **设备端**：收到 file 消息 → 解密 meta → 下载 APK → `promptInstallApk` 弹"安装更新"框
+
+### 2026-08-24 验证记录
+- ✅ 推送 `EVO-测试驱动版.apk`（60MB）→ **3 台安卓全部收到**
+- ✅ 设备收到后自动弹安装框（promptInstallApk + FileProvider + 系统安装器）
+- ⚠️ 注意：走**局域网中继**的设备（如 iQOO 通过 RelayServer 互联）不在云中继房间，收不到广播——需连云中继或同一 Wi-Fi
+
+### 依赖
+- relay-worker.js: `/apk/broadcast` 端点（已部署）
+- 设备端: file 接收 + APK 识别 + promptInstallApk（已实现）
+
 ## 稳定性问题排查流程（"不稳定"复现时）
 
 1. `curl https://relay.vios.top/users` — 看谁在线
