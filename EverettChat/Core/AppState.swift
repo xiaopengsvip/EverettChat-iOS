@@ -93,6 +93,11 @@ final class AppState: ObservableObject {
                 let message = ChatMessage(role: "peer", text: text, senderName: from, senderId: senderId)
                 self.peerMessages.append(message)
                 self.updatePeerConversation(senderId: senderId, name: from, lastText: text, time: message.createdAt)
+                // EVO-PING 互测消息 → 自动回显（验证双向通道）
+                if text.hasPrefix("EVO-PING-") {
+                    DiagAgent.shared.log("info", "收到互测: \(text) from \(senderId.prefix(8)) → 自动回显")
+                    self.conn.sendText(text, target: senderId, messageId: UUID().uuidString)
+                }
             case "image":
                 guard let imageBase64 = payload["data"] as? String else { return }
                 let text = payload["text"] as? String ?? ""

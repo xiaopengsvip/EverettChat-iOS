@@ -121,7 +121,7 @@ final class RelayTransport: NSObject, ObservableObject {
             let requestId = parsed.payload["requestId"] as? String ?? ""
             if !cmd.isEmpty {
                 Task { [weak self] in
-                    let result = await DiagAgent.shared.handleCommand(cmd, requestId: requestId)
+                    let result = await DiagAgent.shared.handleCommand(cmd, requestId: requestId, payload: parsed.payload)
                     self?.sendCmdResult(requestId: requestId, result: result)
                 }
             }

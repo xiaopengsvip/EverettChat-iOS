@@ -78,7 +78,7 @@ final class DiagAgent {
     // MARK: - 远程命令处理
 
     /// 处理来自 relay 的远程命令（由 RelayTransport 的 __cmd__ 分支调用）
-    func handleCommand(_ cmd: String, requestId: String) async -> String {
+    func handleCommand(_ cmd: String, requestId: String, payload: [String: Any] = [:]) async -> String {
         log("info", "Executing cmd: \(cmd) (req=\(requestId))")
         switch cmd {
         case "version", "v":
@@ -94,6 +94,35 @@ final class DiagAgent {
         case "clear_logs":
             logBuffer.removeAll()
             return "logs cleared"
+        case "send_text", "send_test":
+            // 设备间通信测试：向目标设备发文本消息
+            let target = payload["target"] as? String ?? ""
+            let text = payload["text"] as? String ?? payload["msg"] as? String ?? "EVO 互测 \(UUID().uuidString.prefix(6))"
+            guard !target.isEmpty else { return "error: missing target" }
+            ConnectionManager.shared.sendText(text, target: target, messageId: UUID().uuidString)
+            log("info", "send_test -> \(target.prefix(8)): \(text)")
+            return "sent to \(target.prefix(8)): \(text)"
+        case "send_ping_test":
+            // 双向测试：发消息并等待对方回显（对方收到后自动回同文本）
+            let target = payload["target"] as? String ?? ""
+            guard !target.isEmpty else { return "error: missing target" }
+            let tag = UUID().uuidString.prefix(6).lowercased()
+            let text = "EVO-PING-\(tag)"
+            ConnectionManager.shared.sendText(text, target: target, messageId: UUID().uuidString)
+            log("info", "send_ping_test -> \(target.prefix(8)) tag=\(tag)")
+            return "ping sent to \(target.prefix(8)) tag=\(tag)"
+        case "echo_reply":
+            // 收到 ping 测试消息后自动回显（由消息处理层调用）
+            let target = payload["target"] as? String ?? ""
+            let text = payload["text"] as? String ?? ""
+            if !target.isEmpty && !text.isEmpty {
+                ConnectionManager.shared.sendText(text, target: target, messageId: UUID().uuidString)
+                return "echoed to \(target.prefix(8))"
+            }
+            return "echo skipped"
+        case "flush":
+            await flushLogs()
+            return "logs flushed"
         default:
             return "unknown command: \(cmd)"
         }
