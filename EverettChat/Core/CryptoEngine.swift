@@ -140,29 +140,29 @@ enum CryptoEngine {
     // MARK: - ML-KEM-768 (SwiftKyber)
 
     /// 生成 ML-KEM-768 密钥对 → (encapKey, decapKey)
-    static func generateMLKEMKeyPair() -> (encap: Kyber.EncapsulationKey, decap: Kyber.DecapsulationKey) {
+    static func generateMLKEMKeyPair() -> (encap: EncapsulationKey, decap: DecapsulationKey) {
         Kyber.GenerateKeyPair(kind: .K768)
     }
 
     /// 编码 ML-KEM 封装公钥为 Base64
-    static func mlkemPubKeyToB64(_ encap: Kyber.EncapsulationKey) -> String {
+    static func mlkemPubKeyToB64(_ encap: EncapsulationKey) -> String {
         Data(encap.encoded).base64EncodedString()
     }
 
     /// 从 Base64 解码 ML-KEM 封装公钥
-    static func mlkemPubKeyFromB64(_ b64: String) -> Kyber.EncapsulationKey? {
+    static func mlkemPubKeyFromB64(_ b64: String) -> EncapsulationKey? {
         guard let data = Data(base64Encoded: b64) else { return nil }
-        return try? Kyber.EncapsulationKey(keyBytes: [UInt8](data))
+        return try? EncapsulationKey(keyBytes: [UInt8](data))
     }
 
     /// 封装：用对方公钥 → (共享秘密 K 32B, 封装密文 ct)
-    static func mlkemEncapsulate(_ encap: Kyber.EncapsulationKey) -> (secret: Data, kemCt: Data) {
+    static func mlkemEncapsulate(_ encap: EncapsulationKey) -> (secret: Data, kemCt: Data) {
         let (k, ct) = encap.Encapsulate()
         return (Data(k), Data(ct))
     }
 
     /// 解封装：用自己私钥 + 对方封装密文 → 共享秘密 32B
-    static func mlkemDecapsulate(_ decap: Kyber.DecapsulationKey, kemCt: Data) -> Data? {
+    static func mlkemDecapsulate(_ decap: DecapsulationKey, kemCt: Data) -> Data? {
         return try? Data(decap.Decapsulate(ct: [UInt8](kemCt)))
     }
 
@@ -212,7 +212,7 @@ enum CryptoEngine {
                               myX25519Priv: Curve25519.KeyAgreement.PrivateKey,
                               myX25519Pub: Curve25519.KeyAgreement.PublicKey,
                               peerX25519Pub: Curve25519.KeyAgreement.PublicKey,
-                              peerKemPub: Kyber.EncapsulationKey,
+                              peerKemPub: EncapsulationKey,
                               roomId: String, target: String, messageId: String) -> [String: Any]? {
         guard let ss1 = x25519SharedSecret(myPriv: myX25519Priv, peerPub: peerX25519Pub) else { return nil }
         let (ss2, kemCt) = mlkemEncapsulate(peerKemPub)
@@ -234,7 +234,7 @@ enum CryptoEngine {
     /// 解析 v2 payload → 明文
     static func parseV2Payload(_ payload: [String: Any],
                                myX25519Priv: Curve25519.KeyAgreement.PrivateKey,
-                               myKemDecap: Kyber.DecapsulationKey,
+                               myKemDecap: DecapsulationKey,
                                roomId: String) -> String? {
         guard let ephPubB64 = payload["ephPub"] as? String,
               let kemCtB64 = payload["kemCt"] as? String,
