@@ -312,14 +312,14 @@ struct ChatView: View {
         }
         // 相机模式选择（拍照/录像）
         .confirmationDialog("拍摄", isPresented: $showCameraModePicker, titleVisibility: .visible) {
-            Button {
-                                cameraMode = .photo
-                                showCamera = true
-                            } label: { Label("拍照", systemImage: "camera") }
-                            Button {
-                                cameraMode = .video
-                                showCamera = true
-                            } label: { Label("录像", systemImage: "video") }
+            Button("拍照", systemImage: "camera") {
+                cameraMode = .photo
+                showCamera = true
+            }
+            Button("录像", systemImage: "video") {
+                cameraMode = .video
+                showCamera = true
+            }
             Button("取消", role: .cancel) {}
         }
         // 相册（图片 + 视频）
