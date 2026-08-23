@@ -32,6 +32,13 @@ struct MessagesView: View {
                     appState.openAIChat()
                 }
                 .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                .contextMenu {
+                    Button {
+                        FloatingChatManager.shared.open(.ai)
+                    } label: {
+                        Label("浮窗聊天", systemImage: "rectangle.3.group.bubble")
+                    }
+                }
 
                 // 设备互联：本机 Hermes（会话持久化，像普通会话一样）
                 ConversationRow(
@@ -44,6 +51,13 @@ struct MessagesView: View {
                     showDeviceLink = true
                 }
                 .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                .contextMenu {
+                    Button {
+                        FloatingChatManager.shared.open(.device)
+                    } label: {
+                        Label("浮窗聊天", systemImage: "rectangle.3.group.bubble")
+                    }
+                }
             }
 
             if filteredPeers.isEmpty {
@@ -78,6 +92,13 @@ struct MessagesView: View {
                             appState.openPeerChat(name: conv.name, peerId: conv.id)
                         }
                         .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+                        .contextMenu {
+                            Button {
+                                FloatingChatManager.shared.open(.peer(id: conv.id, name: conv.name))
+                            } label: {
+                                Label("浮窗聊天", systemImage: "rectangle.3.group.bubble")
+                            }
+                        }
                     }
                 }
             }

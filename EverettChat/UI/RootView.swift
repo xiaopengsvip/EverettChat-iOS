@@ -73,6 +73,10 @@ struct RootView: View {
             if let req = appState.pendingFriendRequest {
                 FriendRequestDialog(request: req)
             }
+
+            // 全局浮窗聊天（跨 Tab 常驻：AI 助手/好友会话/Hermes 设备）
+            FloatingChatView()
+                .zIndex(100)
         }
         // 主题切换时强制重建整棵视图树（实时响应，不残留旧色）
         .id(themeVersion)

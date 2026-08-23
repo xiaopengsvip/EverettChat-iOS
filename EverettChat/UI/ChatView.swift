@@ -80,13 +80,28 @@ struct ChatView: View {
                             .foregroundColor(Theme.textPrimary)
                     }
                     Spacer()
-                    // 右侧信息
-                    Button {
-                        showInfoSheet = true
-                    } label: {
-                        Image(systemName: "info.circle")
-                            .font(.system(size: 18))
-                            .foregroundColor(Theme.textSecondary)
+                    // 右侧：浮窗 + 信息
+                    HStack(spacing: Spacing.sm) {
+                        // 最小化到浮窗（切到其他页面继续聊）
+                        Button {
+                            if isAI {
+                                FloatingChatManager.shared.open(.ai)
+                            } else {
+                                FloatingChatManager.shared.open(.peer(id: appState.chatPeerId, name: appState.chatPeerName))
+                            }
+                            appState.showChat = false
+                        } label: {
+                            Image(systemName: "rectangle.3.group.bubble")
+                                .font(.system(size: 18))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        Button {
+                            showInfoSheet = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 18))
+                                .foregroundColor(Theme.textSecondary)
+                        }
                     }
                 }
             }
