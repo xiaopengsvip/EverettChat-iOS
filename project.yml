@@ -25,31 +25,34 @@ targets:
       - EvoWidget/EvoActivityAttributes.swift
     dependencies:
       - package: WebRTC
+    info:
+      path: EverettChat/Info.plist
+      properties:
+        CFBundleDisplayName: EVO
+        UILaunchStoryboardName: LaunchScreen
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UIRequiresFullScreen: true
+        NSCameraUsageDescription: "用于视频通话与扫码添加好友"
+        NSMicrophoneUsageDescription: "用于语音消息与语音通话"
+        NSPhotoLibraryUsageDescription: "用于发送图片与保存二维码"
+        NSLocationWhenInUseUsageDescription: "用于天气与定位服务"
+        NFCReaderUsageDescription: "用于 NFC 碰一碰文件互传"
+        NSBluetoothAlwaysUsageDescription: "用于蓝牙直连"
+        NSLocalNetworkUsageDescription: "用于局域网直连设备发现"
+        NSBonjourServices: ["_everett._tcp"]
+        UIBackgroundModes: [voip, audio, remote-notification]
+        NSSupportsLiveActivities: true
+        NSSupportsLiveActivitiesFrequentUpdates: true
+        # ATS：允许局域网 HTTP 明文（设备互联连本机 Hermes）
+        NSAppTransportSecurity:
+          NSAllowsArbitraryLoads: true
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: top.vios.chat
-        INFOPLIST_KEY_CFBundleDisplayName: EVO
-        INFOPLIST_KEY_UILaunchScreen_Generation: NO
-        UILaunchStoryboardName: LaunchScreen
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        INFOPLIST_KEY_UISupportedInterfaceOrientations: UIInterfaceOrientationPortrait
-        INFOPLIST_KEY_UIRequiresFullScreen: YES
-        INFOPLIST_KEY_NSAppTransportSecurity: NSAllowsArbitraryLoads
-        GENERATE_INFOPLIST_FILE: YES
         MARKETING_VERSION: "1.0.0"
         CURRENT_PROJECT_VERSION: "1"
         ENABLE_USER_SCRIPT_SANDBOXING: NO
-        INFOPLIST_KEY_NSCameraUsageDescription: "用于视频通话与扫码添加好友"
-        INFOPLIST_KEY_NSMicrophoneUsageDescription: "用于语音消息与语音通话"
-        INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "用于发送图片与保存二维码"
-        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "用于天气与定位服务"
-        INFOPLIST_KEY_NFCReaderUsageDescription: "用于 NFC 碰一碰文件互传"
-        INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: "用于蓝牙直连"
-        INFOPLIST_KEY_NSLocalNetworkUsageDescription: "用于局域网直连设备发现"
-        INFOPLIST_KEY_NSBonjourServices: "_everett._tcp"
-        INFOPLIST_KEY_UIBackgroundModes: "voip,audio,remote-notification"
-        INFOPLIST_KEY_NSSupportsLiveActivities: YES
-        INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates: YES
 
   EvoWidget:
     type: app-extension
