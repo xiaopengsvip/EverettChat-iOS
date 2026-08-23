@@ -96,6 +96,7 @@ struct ChatView: View {
                 streamReasoning: streamReasoning,
                 deviceName: appState.deviceName,
                 playingVoiceId: playingVoiceId,
+                avatarState: isAI ? currentAvatarState : .idle,
                 onPlayVoice: playVoice,
                 onStopVoice: stopVoice,
                 onCopy: { msg in UIPasteboard.general.string = msg.text },
@@ -310,6 +311,10 @@ struct ChatView: View {
 
     private var currentModel: ApiConfig.ModelInfo {
         ApiConfig.models.first { $0.id == selectedModel } ?? ApiConfig.models[0]
+    }
+    /// AI 头像状态：流式回复时说话，否则待机
+    private var currentAvatarState: AvatarState {
+        isStreaming ? .speaking : (isAI ? .idle : .idle)
     }
     private var currentModelName: String { currentModel.name }
     private var currentModelIcon: String { currentModel.vision ? "👁" : "🤖" }
@@ -562,6 +567,7 @@ struct MessageBubble: View {
     let onPlayVoice: (ChatMessage) -> Void
     let onStopVoice: () -> Void
     @State private var isReasoningExpanded = false
+    var avatarState: AvatarState = .idle
 
     /// 送达状态图标（自己发的消息：✓ 已发送 / ✓✓ 已送达 / ! 失败）
     @ViewBuilder
@@ -586,10 +592,15 @@ struct MessageBubble: View {
         HStack(alignment: .top, spacing: 8) {
             // 左头像列（对方）
             if !isMine {
-                Circle()
-                    .fill(isAI ? Theme.primaryDim : Theme.surfaceAlt)
-                    .frame(width: 36, height: 36)
-                    .overlay(Text(isAI ? "🤖" : "👤").font(.system(size: 18)))
+                // AI：Evo Living Avatar（按状态动画）；对端：占位头像
+                if isAI {
+                    LivingAvatarBubble(state: avatarState, size: 36)
+                } else {
+                    Circle()
+                        .fill(Theme.surfaceAlt)
+                        .frame(width: 36, height: 36)
+                        .overlay(Text("👤").font(.system(size: 18)))
+                }
             } else {
                 Color.clear.frame(width: 44, height: 44)
             }
@@ -1250,6 +1261,7 @@ struct MessageListView: View {
     let streamReasoning: String
     let deviceName: String
     let playingVoiceId: String?
+    var avatarState: AvatarState = .idle
     let onPlayVoice: (ChatMessage) -> Void
     let onStopVoice: () -> Void
     let onCopy: (ChatMessage) -> Void
@@ -1275,7 +1287,8 @@ struct MessageListView: View {
                             deviceName: deviceName,
                             playingVoiceId: playingVoiceId,
                             onPlayVoice: onPlayVoice,
-                            onStopVoice: onStopVoice
+                            onStopVoice: onStopVoice,
+                            avatarState: avatarState
                         )
                         .id(msg.id)
                         .contextMenu {
