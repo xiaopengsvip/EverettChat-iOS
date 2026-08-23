@@ -86,6 +86,7 @@ struct MessagesView: View {
                             subtitle: conv.lastText,
                             time: Self.formatTime(conv.lastTime),
                             unread: conv.unread,
+                            isOnline: appState.onlineDeviceIds.contains(conv.id),
                             avatarImage: ProfileStore.shared.friendAvatar(conv.id)
                         ) {
                             appState.openPeerChat(name: conv.name, peerId: conv.id)
@@ -141,13 +142,14 @@ struct ConversationRow: View {
     var unread: Int = 0
     var accent: Bool = false
     var avatarImage: UIImage? = nil
+    var isOnline: Bool = false
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.md) {
-                // 头像（优先图片，其次 SF Symbol/占位）
-                ZStack {
+                // 头像（优先图片，其次 SF Symbol/占位）+ 在线状态点
+                ZStack(alignment: .bottomTrailing) {
                     Circle()
                         .fill(accent ? Theme.primaryDim : Theme.surfaceAlt)
                     if let avatarImage {
@@ -161,6 +163,12 @@ struct ConversationRow: View {
                             .font(.system(size: 20))
                             .foregroundColor(accent ? Theme.primary : Theme.textSecondary)
                     }
+                    // 在线状态点（绿=在线，灰=离线）
+                    Circle()
+                        .fill(isOnline ? Color(red: 0.20, green: 0.78, blue: 0.35) : Color.gray.opacity(0.6))
+                        .frame(width: 13, height: 13)
+                        .overlay(Circle().stroke(Theme.bg, lineWidth: 2))
+                        .offset(x: 2, y: 2)
                 }
                 .frame(width: 48, height: 48)
 
@@ -169,6 +177,11 @@ struct ConversationRow: View {
                         Text(name)
                             .font(.body.weight(.semibold))
                             .foregroundColor(Theme.textPrimary)
+                        if isOnline {
+                            Text("在线")
+                                .font(.caption2)
+                                .foregroundColor(Color(red: 0.20, green: 0.78, blue: 0.35))
+                        }
                         Spacer()
                         Text(time)
                             .font(.caption2)

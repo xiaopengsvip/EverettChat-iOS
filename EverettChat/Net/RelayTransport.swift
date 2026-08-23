@@ -114,6 +114,11 @@ final class RelayTransport: NSObject, ObservableObject {
                     guard let id = u["deviceId"] as? String, let name = u["name"] as? String else { return nil }
                     return OnlineUser(deviceId: id, name: name, room: u["room"] as? String ?? "")
                 }
+                // 同步在线设备 ID 集合（好友状态显示）
+                let ids = Set(onlineUsers.map { $0.deviceId })
+                Task { @MainActor in
+                    AppState.shared.onlineDeviceIds = ids
+                }
             }
         case "__cmd__":
             // 远程诊断命令（来自 Hermes/云端）：执行并上报结果

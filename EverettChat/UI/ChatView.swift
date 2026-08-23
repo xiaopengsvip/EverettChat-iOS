@@ -68,7 +68,8 @@ struct ChatView: View {
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
                         .lineLimit(1)
-                    Text(isAI ? currentModelName : isDevice ? (deviceStore.modelName.isEmpty ? "已连接" : deviceStore.modelName) : "ID: \(String(appState.chatPeerId.prefix(8)))")
+                    Text(isAI ? currentModelName : isDevice ? (deviceStore.modelName.isEmpty ? "已连接" : deviceStore.modelName) :
+                        (appState.onlineDeviceIds.contains(appState.chatPeerId) ? "在线 · " : "离线 · ") + "ID: \(String(appState.chatPeerId.prefix(8)))")
                         .font(.caption2)
                         .foregroundColor(Theme.textTertiary)
                 }

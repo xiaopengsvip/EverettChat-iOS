@@ -33,6 +33,7 @@ final class AppState: ObservableObject {
         didSet { MessageStore.savePeerMessages(peerMessages) }
     }
     @Published var activeConvId: String? = nil
+    @Published var onlineDeviceIds: Set<String> = []   // 在线设备 ID（relay /users 轮询）
 
     // 联系人
     @Published var contacts: [Contact] = []
