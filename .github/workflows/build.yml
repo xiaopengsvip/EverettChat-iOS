@@ -25,6 +25,14 @@ jobs:
           xcodebuild -showsdks
           echo "=== 实际使用 Xcode ==="
           xcode-select -p
+          # 强制检查：Xcode 必须 >= 27，否则 FAIL（规范：最新 SDK First）
+          XCODE_VERSION=$(xcodebuild -version | head -1 | awk '{print $2}' | cut -d. -f1)
+          echo "Xcode 主版本: $XCODE_VERSION"
+          if [ "$XCODE_VERSION" -lt 27 ]; then
+            echo "::error::Xcode 版本 $XCODE_VERSION < 27，违反最新工具链规范，CI 必须失败"
+            exit 1
+          fi
+          echo "Xcode 27+ 检查通过 ✅"
 
       - name: Install XcodeGen (project.yml 项目，需要生成 .xcodeproj)
         run: |
