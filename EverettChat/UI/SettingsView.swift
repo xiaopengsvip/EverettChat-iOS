@@ -15,6 +15,8 @@ struct SettingsView: View {
     @State private var showSessionPicker = false
     @State private var showStorageManager = false
     @State private var showProfileEdit = false
+    @State private var showUpdateAlert = false
+    @State private var pendingUpdateMessage = ""
 
     var body: some View {
         List {
@@ -127,6 +129,11 @@ struct SettingsView: View {
             Section {
                 SettingsRowLabel(icon: "iphone", title: "版本", subtitle: Self.testVersionString)
                 Button {
+                    checkForUpdate()
+                } label: {
+                    SettingsRowLabel(icon: "arrow.down.circle", title: "检测更新", subtitle: "检查中继网是否有新版本")
+                }
+                Button {
                     openWeb("https://vios.top/")
                 } label: {
                     SettingsRowLabel(icon: "globe", title: "官网", subtitle: "vios.top")
@@ -192,6 +199,12 @@ struct SettingsView: View {
         } message: {
             Text(restoreResult ?? "输入之前保存的恢复密钥")
         }
+        // 检测更新结果
+        .alert("检测更新", isPresented: $showUpdateAlert) {
+            Button("好的", role: .cancel) {}
+        } message: {
+            Text(pendingUpdateMessage)
+        }
         // 连接保持时长选择
         .confirmationDialog("连接保持时长", isPresented: $showSessionPicker, titleVisibility: .visible) {
             ForEach(SessionDuration.allCases, id: \.rawValue) { d in
@@ -238,7 +251,76 @@ struct SettingsView: View {
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
         let device = DeviceIdentity.shared.deviceName
         let shortId = DeviceIdentity.shared.shortId
-        return "v\(appVersion) (\(build)) · iOS · \(device) · \(shortId) · E2Ev1"
+        let osVer = UIDevice.current.systemVersion
+        let model = Self.deviceModelName()
+        return "EVO v\(appVersion)(\(build)) · iOS \(osVer) · \(model) · \(device) · \(shortId) · E2Ev1"
+    }
+
+    /// 设备型号名（iPhone 15 Pro 等）
+    static func deviceModelName() -> String {
+        var sysinfo = utsname()
+        uname(&sysinfo)
+        let mirror = Mirror(reflecting: sysinfo.machine)
+        let identifier = mirror.children.reduce("") { partial, element in
+            guard let value = element.value as? Int8, value != 0 else { return partial }
+            return partial + String(UnicodeScalar(UInt8(value)))
+        }
+        // 常见型号映射（够用即可）
+        let map: [String: String] = [
+            "iPhone14,2": "iPhone 13 Pro", "iPhone14,3": "iPhone 13 Pro Max",
+            "iPhone14,5": "iPhone 13", "iPhone14,7": "iPhone 14",
+            "iPhone14,8": "iPhone 14 Plus", "iPhone15,2": "iPhone 14 Pro",
+            "iPhone15,3": "iPhone 14 Pro Max", "iPhone15,4": "iPhone 15",
+            "iPhone15,5": "iPhone 15 Plus", "iPhone16,1": "iPhone 15 Pro",
+            "iPhone16,2": "iPhone 15 Pro Max", "iPhone16,3": "iPhone 16",
+            "iPhone16,4": "iPhone 16 Plus", "iPhone17,1": "iPhone 16 Pro",
+            "iPhone17,2": "iPhone 16 Pro Max"
+        ]
+        return map[identifier] ?? identifier
+    }
+
+    /// 检查更新（调 relay /update/check）
+    func checkForUpdate() {
+        let base = top.vios.chat.net.PublicRelay.RELAY_URL.isEmpty ? "https://relay.vios.top" : top.vios.chat.net.PublicRelay.RELAY_URL
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+        let curVer = "iOS-v\(appVersion)(\(build))"
+        guard let url = URL(string: "\(base)/update/check?platform=ios&version=\(curVer.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? "")") else { return }
+        var req = URLRequest(url: url)
+        req.timeoutInterval = 15
+        req.setValue("EVO-iOS/\(appVersion)", forHTTPHeaderField: "User-Agent")
+        URLSession.shared.dataTask(with: req) { data, _, err in
+            DispatchQueue.main.async {
+                if let err = err {
+                    self.toast("检查更新失败: \(err.localizedDescription)")
+                    return
+                }
+                guard let data = data,
+                      let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                    self.toast("检查更新失败：中继网无响应")
+                    return
+                }
+                let hasUpdate = obj["hasUpdate"] as? Bool ?? false
+                if !hasUpdate {
+                    self.toast("已是最新版本 \(appVersion)")
+                    return
+                }
+                if let latest = obj["latest"] as? [String: Any] {
+                    let ver = latest["version"] as? String ?? "?"
+                    let name = latest["name"] as? String ?? "EVO-更新"
+                    let sizeMB = (latest["size"] as? Int ?? 0) / 1024 / 1024
+                    self.toast("发现新版本 \(ver)（\(name)，\(sizeMB)MB）\niOS 需签名安装，请用爱思助手安装此包")
+                } else {
+                    self.toast("中继网暂无更新包")
+                }
+            }
+        }.resume()
+    }
+
+    private func toast(_ msg: String) {
+        // 简单提示：横幅 + 弹窗二选一，这里用 alert
+        pendingUpdateMessage = msg
+        showUpdateAlert = true
     }
 
     private func applyThemeMode(_ mode: String) {
