@@ -222,7 +222,6 @@ struct QrScannerView: View {
             .frame(maxWidth: .infinity)
             .background(.black.opacity(0.4))
         }
-        }
         .fullScreenCover(isPresented: $showMyQr) {
             MyQrCodeView()
         }
