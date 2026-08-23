@@ -5,6 +5,8 @@ struct RootView: View {
     @EnvironmentObject var appState: AppState
     @Environment(\.colorScheme) private var colorScheme
     @State private var themeVersion = 0
+    @StateObject private var call = CallManager.shared
+    @State private var showCall = false
 
     var body: some View {
         let _ = themeVersion
@@ -30,6 +32,15 @@ struct RootView: View {
         // 主题切换时强制重建整棵视图树（实时响应，不残留旧色）
         .id(themeVersion)
         .animation(.easeInOut(duration: 0.2), value: appState.showChat)
+        // 全局通话弹窗（来电/去电/通话中）
+        .fullScreenCover(isPresented: $showCall) {
+            CallView()
+        }
+        .onChange(of: call.state) { state in
+            withAnimation {
+                showCall = (state == .ringing || state == .outgoing || state == .connecting || state == .inCall)
+            }
+        }
         .onAppear {
             applyTheme()
             appState.start()

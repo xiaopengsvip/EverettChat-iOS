@@ -132,7 +132,14 @@ struct ChatView: View {
                         onAlbum: { showPhotoPicker = true },
                         onCamera: { showCamera = true },
                         onFile: { showFilePicker = true },
-                        onVoiceCall: { voiceHintText = "语音电话即将上线"; showVoiceHint = true },
+                        onVoiceCall: {
+                            showPlusPanel = false
+                            CallManager.shared.startCall(peerId: appState.chatPeerId, peerName: appState.chatPeerName, type: .audio)
+                        },
+                        onVideoCall: {
+                            showPlusPanel = false
+                            CallManager.shared.startCall(peerId: appState.chatPeerId, peerName: appState.chatPeerName, type: .video)
+                        },
                         onLocation: {
                             voiceHintText = "位置功能即将上线"; showVoiceHint = true
                         },
@@ -1078,6 +1085,7 @@ struct AttachmentPanel: View {
     let onCamera: () -> Void
     let onFile: () -> Void
     let onVoiceCall: () -> Void
+    let onVideoCall: () -> Void
     let onLocation: () -> Void
     let onRedPacket: () -> Void
     let onGift: () -> Void
@@ -1106,7 +1114,7 @@ struct AttachmentPanel: View {
     // 第 2 页：其余
     private var page2: [AttachmentItemData] {
         [
-            AttachmentItemData(icon: "mic.circle.fill", color: Color(hex: 0xAF52DE), label: "语音输入", action: onVoiceInput),
+            AttachmentItemData(icon: "video.fill", color: Color(hex: 0xAF52DE), label: "视频通话", action: onVideoCall),
             AttachmentItemData(icon: "person.crop.square.fill", color: Color(hex: 0x007AFF), label: "名片", action: onNamecard),
         ]
     }

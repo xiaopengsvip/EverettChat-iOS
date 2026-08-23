@@ -31,16 +31,29 @@ final class ConnectionManager: ObservableObject {
     @Published var isConnected = false
     @Published var onlineUsers: [RelayTransport.OnlineUser] = []
 
-    // 消息回调（统一入口：AppState 只认这一个）
-    var onMessage: ((String, String, String, [String: Any]) -> Void)?
+    // 消息回调（统一入口：AppState / CallManager 等各自注册）
+    private var messageHandlers: [(String, String, String, [String: Any]) -> Void] = []
+    var onMessage: ((String, String, String, [String: Any]) -> Void)? {
+        didSet {
+            // 兼容旧用法：设置 onMessage 时作为唯一 handler
+            if let onMessage {
+                messageHandlers = [onMessage]
+            }
+        }
+    }
     var onStatusChange: ((Bool) -> Void)?
+
+    /// 注册消息订阅者（多播：AppState + CallManager 同时接收）
+    func addMessageHandler(_ handler: @escaping (String, String, String, [String: Any]) -> Void) {
+        messageHandlers.append(handler)
+    }
 
     private var cancellables = Set<AnyCancellable>()
 
     private init() {
         // 桥接 Cloud 传输层
         cloud.onMessage = { [weak self] type, from, senderId, payload in
-            self?.onMessage?(type, from, senderId, payload)
+            self?.messageHandlers.forEach { $0(type, from, senderId, payload) }
         }
         cloud.onStatusChange = { [weak self] connected in
             self?.isConnected = connected
