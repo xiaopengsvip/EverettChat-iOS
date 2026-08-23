@@ -281,7 +281,7 @@ struct SettingsView: View {
 
     /// 检查更新（调 relay /update/check）
     func checkForUpdate() {
-        let base = top.vios.chat.net.PublicRelay.RELAY_URL.isEmpty ? "https://relay.vios.top" : top.vios.chat.net.PublicRelay.RELAY_URL
+        let base = PublicRelay.httpURL
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
         let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
         let curVer = "iOS-v\(appVersion)(\(build))"
