@@ -14,6 +14,7 @@ struct DiscoverView: View {
             ScrollView {
                 VStack(spacing: 0) {
                     FeatureRow(icon: "🎮", name: "游戏中心", desc: "game.vios.top · 原生打开") { showGame = true }
+                    FeatureRow(icon: "📁", name: "文件互传", desc: "NFC 碰一碰 / 蓝牙 / 局域网") { featurePage = "ft" }
                     FeatureRow(icon: "📡", name: "局域网直连", desc: "同一 Wi-Fi · 配对码/扫描") { featurePage = "lan" }
                     FeatureRow(icon: "☁️", name: "云中继", desc: "公网跨网络 · 在线设备") { featurePage = "relay" }
                     FeatureRow(icon: "📶", name: "蓝牙直连", desc: "近距离 · 无需 Wi-Fi") { featurePage = "bt" }
@@ -40,6 +41,7 @@ struct DiscoverView: View {
 }
 
 enum FeaturePage: String, Identifiable {
+    case ft = "ft"
     case lan = "lan"
     case relay = "relay"
     case bt = "bt"
@@ -85,20 +87,33 @@ struct FeaturePageView: View {
             }
             .padding(Spacing.md)
 
-            Spacer()
-            Text("\(title)功能页（开发中）")
-                .font(.footnote).foregroundColor(Theme.textTertiary)
-            Spacer()
+            content
         }
         .background(Theme.bg)
     }
 
     private var title: String {
         switch page {
+        case .ft: return "文件互传"
         case .lan: return "局域网直连"
         case .relay: return "云中继"
         case .bt: return "蓝牙直连"
         case .topo: return "中继网可视化"
+        }
+    }
+
+    @ViewBuilder
+    private var content: some View {
+        switch page {
+        case .ft:
+            FileTransferView()
+        default:
+            VStack {
+                Spacer()
+                Text("\(title)功能页（开发中）")
+                    .font(.footnote).foregroundColor(Theme.textTertiary)
+                Spacer()
+            }
         }
     }
 }

@@ -217,10 +217,11 @@ struct QrScannerView: View {
                         .padding(.bottom, 6)
                         .transition(.move(edge: .bottom).combined(with: .opacity))
                 }
-                .padding(.vertical, 12)
-                .frame(maxWidth: .infinity)
-                .background(.black.opacity(0.4))
             }
+            .padding(.vertical, 12)
+            .frame(maxWidth: .infinity)
+            .background(.black.opacity(0.4))
+        }
         }
         .fullScreenCover(isPresented: $showMyQr) {
             MyQrCodeView()
