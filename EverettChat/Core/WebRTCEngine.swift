@@ -21,22 +21,39 @@ final class WebRTCEngine: NSObject, ObservableObject {
     private var conn: ConnectionManager { ConnectionManager.shared }
     private var videoEnabled = false
 
-    // STUN（公共）+ TURN（Cloudflare Calls / 自定义）
-    private var iceServers: [RTCIceServer] {
-        var servers = [
+    // STUN（公共）+ TURN（relay 动态获取 Cloudflare Calls 凭据）
+    private var staticIceServers: [RTCIceServer] {
+        [
             RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302"]),
             RTCIceServer(urlStrings: ["stun:stun1.l.google.com:19302"])
         ]
-        // 用户自配 TURN（Cloudflare Calls / coturn）
-        // Cloudflare Calls 开通：https://dash.cloudflare.com → Realtime / Calls → 创建 TURN 凭据
-        // 填入设置 → TURN URL / 用户名 / 密码
-        if let turnURL = UserDefaults.standard.string(forKey: "turn_url"),
-           !turnURL.isEmpty {
-            let user = UserDefaults.standard.string(forKey: "turn_user") ?? ""
-            let pass = UserDefaults.standard.string(forKey: "turn_pass") ?? ""
-            servers.append(RTCIceServer(urlStrings: [turnURL], username: user, credential: pass))
-        }
-        return servers
+    }
+
+    // 从 relay 获取 Cloudflare TURN 凭据（动态，1h 有效）
+    private var turnServers: [RTCIceServer] = []
+
+    /// 刷新 TURN 凭据（通话前调用）
+    func refreshTurnCredentials() {
+        guard let url = URL(string: "\(PublicRelay.httpURL)/turn/credentials?ttl=3600") else { return }
+        var request = URLRequest(url: url)
+        request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+        request.timeoutInterval = 15
+        URLSession.shared.dataTask(with: request) { [weak self] data, _, _ in
+            guard let data,
+                  let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                  let ice = json["iceServers"] as? [String: Any],
+                  let urls = ice["urls"] as? [String],
+                  let username = ice["username"] as? String,
+                  let credential = ice["credential"] as? String else { return }
+            let servers = urls.map { RTCIceServer(urlStrings: [$0], username: username, credential: credential) }
+            DispatchQueue.main.async {
+                self?.turnServers = servers
+            }
+        }.resume()
+    }
+
+    private var iceServers: [RTCIceServer] {
+        staticIceServers + turnServers
     }
 
     private override init() {

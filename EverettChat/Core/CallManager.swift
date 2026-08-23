@@ -95,6 +95,8 @@ final class CallManager: ObservableObject {
         self.peerName = peerName
         self.callType = type
         self.state = .outgoing
+        // 刷新 TURN 凭据（Cloudflare Calls 动态凭据）
+        WebRTCEngine.shared.refreshTurnCredentials()
         conn.send(type: "call-start", target: peerId, payload: [
             "callType": type == .video ? "video" : "audio",
             "target": peerId
@@ -115,6 +117,8 @@ final class CallManager: ObservableObject {
     func acceptCall() {
         guard state == .ringing else { return }
         state = .connecting
+        // 刷新 TURN 凭据（Cloudflare Calls 动态凭据）
+        WebRTCEngine.shared.refreshTurnCredentials()
         conn.send(type: "call-accept", target: peerId, payload: ["target": peerId])
         // 启动 WebRTC 引擎（应答 Offer）
         WebRTCEngine.shared.acceptCall(type: callType)
