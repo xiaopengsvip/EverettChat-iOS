@@ -64,7 +64,7 @@ struct DeveloperView: View {
         let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         logVersion = "EVO v\(appVersion)"
         // 取本机 DiagAgent 日志缓冲
-        let logs = DiagAgent.shared.recentLogs(count: 30)
+        let logs = DiagAgent.shared.recentLogs(30)
         if logs.isEmpty {
             recentLogs = "暂无日志记录"
         } else {

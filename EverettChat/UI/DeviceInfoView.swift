@@ -60,6 +60,6 @@ extension DeviceIdentity {
     /// 自定义设备名（写入 customNameKey）
     func setName(_ name: String) {
         let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
-        defaults.set(trimmed.isEmpty ? deviceName : trimmed, forKey: customNameKey)
+        UserDefaults.standard.set(trimmed.isEmpty ? deviceName : trimmed, forKey: "everett_custom_name")
     }
 }

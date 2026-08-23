@@ -206,16 +206,7 @@ struct ChatView: View {
                             voiceHintText = "语音输入即将上线"; showVoiceHint = true
                         },
                         onNamecard: {
-                            let card = "我的 ID: \(DeviceIdentity.shared.shortId) · 昵称: \(DeviceIdentity.shared.deviceName)"
-                            if isAI {
-                                let msg = ChatMessage(role: "user", text: card)
-                                messages.append(msg)
-                                sendAI(text: card, imageBase64: "")
-                            } else {
-                                let msg = ChatMessage(role: "user", text: card, senderId: appState.chatPeerId)
-                                messages.append(msg)
-                                appState.conn.sendText(card, target: appState.chatPeerId, messageId: msg.id)
-                            }
+                            sendNamecard()
                             showPlusPanel = false
                         }
                     )
@@ -460,6 +451,19 @@ struct ChatView: View {
     /// 当前会话的消息（按 chatPeerId 过滤）
     private func peerMessagesForCurrent() -> [ChatMessage] {
         appState.peerMessages.filter { $0.senderId == appState.chatPeerId }
+    }
+
+    private func sendNamecard() {
+        let card = "我的 ID: \(DeviceIdentity.shared.shortId) · 昵称: \(DeviceIdentity.shared.deviceName)"
+        if isAI {
+            let msg = ChatMessage(role: "user", text: card)
+            messages.append(msg)
+            sendAI(text: card, imageBase64: "")
+        } else {
+            let msg = ChatMessage(role: "user", text: card, senderId: appState.chatPeerId)
+            messages.append(msg)
+            appState.conn.sendText(card, target: appState.chatPeerId, messageId: msg.id)
+        }
     }
 
     /// 写回当前会话消息（合并进全局 peerMessages）
