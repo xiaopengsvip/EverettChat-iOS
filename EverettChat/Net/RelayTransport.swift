@@ -261,9 +261,13 @@ final class RelayTransport: NSObject, ObservableObject {
 extension RelayTransport: URLSessionWebSocketDelegate {
     nonisolated func urlSession(_ session: URLSession, webSocketTask: URLSessionWebSocketTask, didOpenWithProtocol protocol: String?) {
         // 加入房间
+        let appVer = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
         let join: [String: Any] = ["type": "join", "id": UUID().uuidString,
                                    "from": deviceName, "senderId": deviceId,
-                                   "payload": ["room": room]]
+                                   "payload": ["room": room,
+                                               "platform": "ios",
+                                               "version": "iOS-v\(appVer)(\(build))"]]
         if let data = try? JSONSerialization.data(withJSONObject: join),
            let text = String(data: data, encoding: .utf8) {
             webSocketTask.send(.string(text)) { _ in }
