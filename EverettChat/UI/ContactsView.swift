@@ -21,7 +21,7 @@ struct ContactsView: View {
 
     var body: some View {
         List {
-            Section("我的联系人 (\\(appState.contacts.count))") {
+            Section("我的联系人 (\(appState.contacts.count))") {
                 if appState.contacts.isEmpty {
                     Text("暂无联系人，添加后即可长期通信")
                         .font(.footnote)
@@ -61,7 +61,7 @@ struct UserRow: View {
                 .overlay(Image(systemName: "person.fill").font(.system(size: 16)).foregroundColor(Theme.textSecondary))
             VStack(alignment: .leading) {
                 Text(user.name).font(.body.weight(.medium)).foregroundColor(Theme.textPrimary)
-                Text("ID: \\(String(user.deviceId.prefix(8)))").font(.caption.monospaced()).foregroundColor(Theme.textTertiary)
+                Text("ID: \(String(user.deviceId.prefix(8)))").font(.caption.monospaced()).foregroundColor(Theme.textTertiary)
             }
             Spacer()
             Button(isFriend ? "已添加" : "添加") {
@@ -90,7 +90,7 @@ struct ContactRow: View {
                     .overlay(Image(systemName: "person.fill").font(.system(size: 16)).foregroundColor(Theme.textSecondary))
                 VStack(alignment: .leading) {
                     Text(contact.name).font(.body.weight(.medium)).foregroundColor(Theme.textPrimary)
-                    Text("ID: \\(String(contact.deviceId.prefix(8)))").font(.caption.monospaced()).foregroundColor(Theme.textTertiary)
+                    Text("ID: \(String(contact.deviceId.prefix(8)))").font(.caption.monospaced()).foregroundColor(Theme.textTertiary)
                 }
                 Spacer()
                 Image(systemName: "chevron.right").font(.caption).foregroundColor(Theme.textTertiary)

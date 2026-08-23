@@ -125,7 +125,7 @@ struct SettingsView: View {
 
             // 关于
             Section {
-                SettingsRowLabel(icon: "iphone", title: "版本", subtitle: "v1.0.0 · iOS")
+                SettingsRowLabel(icon: "iphone", title: "版本", subtitle: Self.testVersionString)
                 Button {
                     openWeb("https://vios.top/")
                 } label: {
@@ -230,6 +230,15 @@ struct SettingsView: View {
             get: { UserDefaults.standard.string(forKey: "theme_mode") ?? "system" },
             set: { applyThemeMode($0) }
         )
+    }
+
+    /// 测试版本号（截图可识别设备/协议/构建日期，正式版可移除）
+    static var testVersionString: String {
+        let appVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
+        let build = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+        let device = DeviceIdentity.shared.deviceName
+        let shortId = DeviceIdentity.shared.shortId
+        return "v\(appVersion) (\(build)) · iOS · \(device) · \(shortId) · E2Ev1"
     }
 
     private func applyThemeMode(_ mode: String) {

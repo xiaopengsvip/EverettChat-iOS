@@ -99,7 +99,7 @@ struct FeaturePageView: View {
                 default:
                     VStack {
                         Spacer()
-                        Text("\\(title)功能页（开发中）")
+                        Text("\(title)功能页（开发中）")
                             .font(.footnote).foregroundColor(Theme.textTertiary)
                         Spacer()
                     }

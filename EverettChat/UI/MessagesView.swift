@@ -181,7 +181,7 @@ struct ConversationRow: View {
                             .lineLimit(1)
                         Spacer()
                         if unread > 0 {
-                            Text("\\(unread)")
+                            Text("\(unread)")
                                 .font(.caption2.bold())
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 6)
