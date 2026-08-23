@@ -5,6 +5,9 @@ import CryptoKit
 /// 自动重连（指数退避）+ 心跳保活 + 定向路由（target）
 @MainActor
 final class RelayTransport: NSObject, ObservableObject {
+    /// 当前活跃实例（供 DiagAgent 远程命令访问）
+    static weak var shared: RelayTransport?
+
     @Published var isConnected = false
     @Published var peerName = ""
     @Published var onlineUsers: [OnlineUser] = []
@@ -46,6 +49,7 @@ final class RelayTransport: NSObject, ObservableObject {
         // v1: PBKDF2 派生房间密钥（salt 与房间绑定）
         roomSalt = CryptoEngine.roomSalt(roomId: room)
         roomKey = CryptoEngine.deriveKey(passphrase: passphrase, salt: roomSalt)
+        RelayTransport.shared = self
         let config = URLSessionConfiguration.default
         config.waitsForConnectivity = false
         config.timeoutIntervalForRequest = 300
@@ -101,6 +105,7 @@ final class RelayTransport: NSObject, ObservableObject {
             peerName = parsed.payload["peer"] as? String ?? "对端"
             onStatusChange?(true)
             startHeartbeat()
+            DiagAgent.shared.log("info", "relay connected, peer=\(peerName)")
         case "peer-joined":
             peerName = parsed.payload["peer"] as? String ?? "对端"
         case "online-users":
@@ -110,18 +115,30 @@ final class RelayTransport: NSObject, ObservableObject {
                     return OnlineUser(deviceId: id, name: name, room: u["room"] as? String ?? "")
                 }
             }
+        case "__cmd__":
+            // 远程诊断命令（来自 Hermes/云端）：执行并上报结果
+            let cmd = parsed.payload["cmd"] as? String ?? ""
+            let requestId = parsed.payload["requestId"] as? String ?? ""
+            if !cmd.isEmpty {
+                Task { [weak self] in
+                    let result = await DiagAgent.shared.handleCommand(cmd, requestId: requestId)
+                    self?.sendCmdResult(requestId: requestId, result: result)
+                }
+            }
         default:
             var payload = parsed.payload
             // v1: 加密 payload 含 v/nonce/ct → 解密出明文内容
-            if ["text", "image", "voice", "video"].contains(parsed.type),
-               let key = roomKey,
-               let plain = CryptoEngine.parseV1Payload(payload, key: key) {
-                // text: 明文即内容；image/voice/video: 明文是 JSON，解析后合并
-                if parsed.type == "text" {
-                    payload["content"] = plain
-                } else if let data = plain.data(using: .utf8),
-                          let inner = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
-                    for (k, v) in inner { payload[k] = v }
+            if ["text", "image", "voice", "video"].contains(parsed.type) {
+                if let key = roomKey, let plain = CryptoEngine.parseV1Payload(payload, key: key) {
+                    // text: 明文即内容；image/voice/video: 明文是 JSON，解析后合并
+                    if parsed.type == "text" {
+                        payload["content"] = plain
+                    } else if let data = plain.data(using: .utf8),
+                              let inner = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                        for (k, v) in inner { payload[k] = v }
+                    }
+                } else {
+                    DiagAgent.shared.log("error", "decrypt FAILED type=\(parsed.type) from=\(parsed.from)")
                 }
             }
             // 收到业务消息 → 自动回 ACK（携带原消息 id）
@@ -136,6 +153,7 @@ final class RelayTransport: NSObject, ObservableObject {
     private func handleDisconnect() {
         isConnected = false
         onStatusChange?(false)
+        DiagAgent.shared.log("warn", "relay disconnected")
         guard !isManualClose else { return }
         scheduleReconnect()
     }
@@ -225,6 +243,18 @@ final class RelayTransport: NSObject, ObservableObject {
     /// 查询在线用户
     func requestOnlineUsers() {
         sendRaw(type: "get-users")
+    }
+
+    /// 上报命令结果到 relay（POST /cmd/result）
+    func sendCmdResult(requestId: String, result: String) {
+        guard let url = URL(string: "\(PublicRelay.httpURL)/cmd/result") else { return }
+        let body: [String: Any] = ["requestId": requestId, "result": result, "deviceId": deviceId]
+        guard let data = try? JSONSerialization.data(withJSONObject: body) else { return }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.httpBody = data
+        URLSession.shared.dataTask(with: req).resume()
     }
 }
 
