@@ -248,12 +248,15 @@ struct QrScannerView: View {
             dismiss()
             return
         }
+        // 先关闭扫描页，再延迟打开聊天（避免 dismiss 动画吞掉 showChat）
         dismiss()
-        // 已是好友 → 直接进入聊天；否则发请求
-        if appState.contacts.contains(where: { $0.deviceId == targetId }) {
-            appState.openPeerChat(name: targetName, peerId: targetId)
-        } else {
-            appState.sendFriendRequest(targetId: targetId, targetName: targetName)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+            // 已是好友 → 直接进入聊天；否则发请求
+            if self.appState.contacts.contains(where: { $0.deviceId == targetId }) {
+                self.appState.openPeerChat(name: targetName, peerId: targetId)
+            } else {
+                self.appState.sendFriendRequest(targetId: targetId, targetName: targetName)
+            }
         }
     }
 }
