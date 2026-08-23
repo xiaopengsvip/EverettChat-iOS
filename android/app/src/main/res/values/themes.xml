@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.EverettChat" parent="android:Theme.Material.NoActionBar">
+        <item name="android:statusBarColor">#0A0A12</item>
+        <item name="android:navigationBarColor">#0A0A12</item>
+        <item name="android:windowBackground">#0A0A12</item>
+    </style>
+
+    <!-- EVO 启动封面主题（SplashActivity，Android 12+ 官方 SplashScreen API） -->
+    <style name="Theme.EverettChat.Splash" parent="Theme.SplashScreen">
+        <!-- 系统 splash：纯色背景（与封面底色一致，无裁切）+ 无图标 -->
+        <item name="windowSplashScreenBackground">#0A0A12</item>
+        <item name="windowSplashScreenAnimatedIcon">@android:color/transparent</item>
+        <item name="postSplashScreenTheme">@style/Theme.EverettChat.SplashPost</item>
+    </style>
+
+    <!-- splash 之后的主题（SplashActivity 全屏封面） -->
+    <style name="Theme.EverettChat.SplashPost" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowFullscreen">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:windowLayoutInDisplayCutoutMode">shortEdges</item>
+        <item name="android:statusBarColor">@android:color/transparent</item>
+        <item name="android:navigationBarColor">@android:color/transparent</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:windowBackground">#0A0A12</item>
+    </style>
+</resources>

@@ -1,0 +1,10 @@
+#!/bin/sh
+# Gradle wrapper script - minimal
+# 使用系统中已有的 gradle 缓存或下载 gradle 8.9
+DIR="$(cd "$(dirname "$0")" && pwd)"
+GRADLE_HOME="$DIR/../gradle-dist"
+if [ ! -f "$GRADLE_HOME/bin/gradle" ]; then
+  echo "请先运行: bash setup-gradle.sh"
+  exit 1
+fi
+"$GRADLE_HOME/bin/gradle" "$@"
