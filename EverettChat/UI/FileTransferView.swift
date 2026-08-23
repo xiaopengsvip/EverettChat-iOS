@@ -1,6 +1,7 @@
 import SwiftUI
 import MultipeerConnectivity
 import CoreNFC
+import PhotosUI
 
 /// 文件互传传输模式
 enum TransferMode: String, CaseIterable {
