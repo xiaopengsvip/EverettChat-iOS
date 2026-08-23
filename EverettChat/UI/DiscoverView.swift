@@ -5,12 +5,14 @@ struct DiscoverView: View {
     @EnvironmentObject var appState: AppState
     @State private var featurePage: String? = nil
     @State private var showGame = false
+    @State private var showDeviceLink = false
 
     var body: some View {
         List {
             Section {
                 FeatureRow(icon: "gamecontroller", name: "游戏中心", desc: "game.vios.top") { showGame = true }
                 FeatureRow(icon: "arrow.up.arrow.down", name: "文件互传", desc: "NFC 碰一碰 / 蓝牙 / 局域网") { featurePage = "ft" }
+                FeatureRow(icon: "desktopcomputer", name: "设备互联", desc: "连接本机 Hermes AI 助手") { showDeviceLink = true }
             }
             Section {
                 FeatureRow(icon: "wifi", name: "局域网直连", desc: "同一 Wi-Fi · 配对码/扫描") { featurePage = "lan" }
@@ -29,6 +31,9 @@ struct DiscoverView: View {
         // 游戏中心：应用内原生全屏打开（不跳出 Safari）
         .fullScreenCover(isPresented: $showGame) {
             SafariView(url: URL(string: "https://game.vios.top/")!)
+        }
+        .sheet(isPresented: $showDeviceLink) {
+            DeviceLinkView()
         }
         .sheet(item: Binding(
             get: { featurePage.map { FeaturePage(rawValue: $0)! } },
