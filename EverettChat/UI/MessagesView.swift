@@ -5,6 +5,8 @@ struct MessagesView: View {
     @EnvironmentObject var appState: AppState
     @Binding var showAddSheet: Bool
     @State private var searchQuery = ""
+    @State private var showDeviceLink = false
+    @StateObject private var deviceStore = DeviceLinkStore.shared
 
     private var filteredPeers: [Conversation] {
         let peers = appState.conversations
@@ -28,6 +30,18 @@ struct MessagesView: View {
                     accent: true
                 ) {
                     appState.openAIChat()
+                }
+                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+
+                // 设备互联：本机 Hermes（会话持久化，像普通会话一样）
+                ConversationRow(
+                    icon: "desktopcomputer",
+                    name: "Hermes 设备",
+                    subtitle: deviceStore.lastMessageText,
+                    time: deviceStore.messages.isEmpty ? "" : Self.formatTime(deviceStore.lastMessageTime),
+                    accent: false
+                ) {
+                    showDeviceLink = true
                 }
                 .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
             }
@@ -76,6 +90,9 @@ struct MessagesView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 TitleBarButton(icon: "plus") { showAddSheet = true }
             }
+        }
+        .sheet(isPresented: $showDeviceLink) {
+            DeviceLinkView()
         }
     }
 

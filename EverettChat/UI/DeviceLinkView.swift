@@ -3,14 +3,12 @@ import SwiftUI
 /// 设备互联：连接本机 Hermes AI 助手（OpenAI 兼容 API）
 struct DeviceLinkView: View {
     @Environment(\.dismiss) private var dismiss
-    @State private var host = "172.11.8.35"
-    @State private var port = "8642"
-    @State private var apiKey = "evt-0a064c103a11512f7781bf6f999bf1fe"
-    @State private var isConnected = false
+    @StateObject private var store = DeviceLinkStore.shared
+    @State private var host = ""
+    @State private var port = ""
+    @State private var apiKey = ""
     @State private var connecting = false
     @State private var statusText = ""
-    @State private var modelName = ""
-    @State private var messages: [ChatMsg] = []
     @State private var input = ""
     @State private var isSending = false
 
@@ -36,14 +34,14 @@ struct DeviceLinkView: View {
                         TextField("IP 地址", text: $host)
                             .multilineTextAlignment(.trailing)
                             .foregroundColor(.secondary)
-                            .disabled(isConnected)
+                            .disabled(store.isConnected)
                         Text(":")
                             .foregroundColor(.secondary)
                         TextField("端口", text: $port)
                             .frame(width: 60)
                             .multilineTextAlignment(.trailing)
                             .foregroundColor(.secondary)
-                            .disabled(isConnected)
+                            .disabled(store.isConnected)
                     }
                     HStack {
                         Text("密钥")
@@ -51,10 +49,10 @@ struct DeviceLinkView: View {
                         TextField("API Key", text: $apiKey)
                             .multilineTextAlignment(.trailing)
                             .foregroundColor(.secondary)
-                            .disabled(isConnected)
+                            .disabled(store.isConnected)
                     }
                     // 快捷地址：局域网 / Tailscale（VPN 互通）
-                    if !isConnected {
+                    if !store.isConnected {
                         HStack(spacing: 8) {
                             Text("快捷")
                             Spacer()
@@ -73,7 +71,7 @@ struct DeviceLinkView: View {
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
-                    if isConnected {
+                    if store.isConnected {
                         HStack {
                             Text("状态")
                             Spacer()
@@ -81,11 +79,11 @@ struct DeviceLinkView: View {
                                 .foregroundColor(.green)
                                 .font(.caption)
                         }
-                        if !modelName.isEmpty {
+                        if !store.modelName.isEmpty {
                             HStack {
                                 Text("模型")
                                 Spacer()
-                                Text(modelName)
+                                Text(store.modelName)
                                     .font(.caption.monospaced())
                                     .foregroundColor(.secondary)
                             }
@@ -95,27 +93,27 @@ struct DeviceLinkView: View {
 
                 // 连接/断开按钮
                 Section {
-                    Button(action: isConnected ? disconnect : connect) {
+                    Button(action: store.isConnected ? disconnect : connect) {
                         HStack {
                             Spacer()
                             if connecting {
                                 ProgressView()
                                     .scaleEffect(0.8)
                             } else {
-                                Label(isConnected ? "断开连接" : "连接设备",
-                                      systemImage: isConnected ? "minus.circle" : "link")
+                                Label(store.isConnected ? "断开连接" : "连接设备",
+                                      systemImage: store.isConnected ? "minus.circle" : "link")
                             }
                             Spacer()
                         }
-                        .foregroundColor(isConnected ? .red : Theme.primary)
+                        .foregroundColor(store.isConnected ? .red : Theme.primary)
                     }
                     .disabled(connecting || host.isEmpty)
                 }
 
                 // 对话区
-                if isConnected {
+                if store.isConnected {
                     Section("AI 对话（Hermes）") {
-                        ForEach(messages) { msg in
+                        ForEach(store.messages) { msg in
                             VStack(alignment: msg.isUser ? .trailing : .leading, spacing: 4) {
                                 Text(msg.isUser ? "你" : "Hermes")
                                     .font(.caption2)
@@ -174,6 +172,19 @@ struct DeviceLinkView: View {
                 }
             }
         }
+        .onAppear {
+            // 从 store 恢复配置（持久化的地址/密钥/连接状态）
+            host = store.host
+            port = store.port
+            apiKey = store.apiKey
+        }
+        .onDisappear {
+            // 保存配置
+            store.host = host
+            store.port = port
+            store.apiKey = apiKey
+            store.save()
+        }
     }
 
     private func connect() {
@@ -201,20 +212,21 @@ struct DeviceLinkView: View {
                     statusText = "连接失败: 响应格式错误"
                     return
                 }
-                isConnected = true
-                modelName = models.first?["id"] as? String ?? "Hermes"
-                statusText = "已连接 \(modelName)"
+                store.isConnected = true
+                store.modelName = models.first?["id"] as? String ?? "Hermes"
+                statusText = "已连接 \(store.modelName)"
                 // 默认问候
-                messages = [ChatMsg(content: "已连接到 Hermes Agent（\(modelName)），可以开始对话了 ✨", isUser: false)]
+                store.messages = [ChatMsg(content: "已连接到 Hermes Agent（\(store.modelName)），可以开始对话了 ✨", isUser: false)]
             }
         }.resume()
     }
 
     private func disconnect() {
-        isConnected = false
-        modelName = ""
-        messages = []
+        store.isConnected = false
+        store.modelName = ""
+        store.messages = []
         statusText = "已断开"
+        store.save()
     }
 
     private func sendMessage() {
@@ -222,18 +234,21 @@ struct DeviceLinkView: View {
         guard !text.isEmpty else { return }
         input = ""
         let userMsg = ChatMsg(content: text, isUser: true)
-        messages.append(userMsg)
+        store.messages.append(userMsg)
+        store.lastMessageTime = Date()
+        store.save()
         isSending = true
 
         let payload: [String: Any] = [
             "model": "hermes-agent",
-            "messages": messages.map { ["role": $0.isUser ? "user" : "assistant", "content": $0.content] }
+            "messages": store.messages.map { ["role": $0.isUser ? "user" : "assistant", "content": $0.content] }
         ]
         guard let url = URL(string: "\(baseURL)/v1/chat/completions"),
               let body = try? JSONSerialization.data(withJSONObject: payload) else { return }
 
         var req = URLRequest(url: url)
         req.httpMethod = "POST"
+        req.httpBody = body
         req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.timeoutInterval = 120
@@ -242,35 +257,37 @@ struct DeviceLinkView: View {
             DispatchQueue.main.async {
                 isSending = false
                 if let error = error {
-                    messages.append(ChatMsg(content: "请求失败: \(error.localizedDescription)", isUser: false))
+                    store.messages.append(ChatMsg(content: "请求失败: \(error.localizedDescription)", isUser: false))
                     return
                 }
                 guard let data = data,
                       let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
                     // 显示原始响应片段，便于诊断
                     let raw = data.map { String(data: $0, encoding: .utf8) ?? "非文本响应" } ?? "无响应数据"
-                    messages.append(ChatMsg(content: "响应解析失败（原始: \(String(raw.prefix(200)))）", isUser: false))
+                    store.messages.append(ChatMsg(content: "响应解析失败（原始: \(String(raw.prefix(200)))）", isUser: false))
                     return
                 }
                 // OpenAI 错误信封
                 if let err = json["error"] as? [String: Any],
                    let errMsg = err["message"] as? String {
-                    messages.append(ChatMsg(content: "Hermes 错误: \(errMsg)", isUser: false))
+                    store.messages.append(ChatMsg(content: "Hermes 错误: \(errMsg)", isUser: false))
                     return
                 }
                 guard let choices = json["choices"] as? [[String: Any]],
                       let msg = choices.first?["message"] as? [String: Any] else {
-                    messages.append(ChatMsg(content: "响应格式异常: \(String(describing: json).prefix(200))", isUser: false))
+                    store.messages.append(ChatMsg(content: "响应格式异常: \(String(describing: json).prefix(200))", isUser: false))
                     return
                 }
                 // content 可能为 null（纯工具调用/思考），宽容处理
                 if let content = msg["content"] as? String, !content.isEmpty {
-                    messages.append(ChatMsg(content: content, isUser: false))
+                    store.messages.append(ChatMsg(content: content, isUser: false))
                 } else if let reasoning = msg["reasoning_content"] as? String, !reasoning.isEmpty {
-                    messages.append(ChatMsg(content: "（思考中）\(reasoning)", isUser: false))
+                    store.messages.append(ChatMsg(content: "（思考中）\(reasoning)", isUser: false))
                 } else {
-                    messages.append(ChatMsg(content: "（Hermes 无文本输出，可能正在调用工具）", isUser: false))
+                    store.messages.append(ChatMsg(content: "（Hermes 无文本输出，可能正在调用工具）", isUser: false))
                 }
+                store.lastMessageTime = Date()
+                store.save()
             }
         }.resume()
     }
