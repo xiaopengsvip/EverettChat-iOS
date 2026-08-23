@@ -172,57 +172,6 @@ struct ChatView: View {
         .fullScreenCover(item: $videoToPlay) { b64 in
             FullscreenVideoView(videoBase64: b64)
         }
-        .onAppear {
-            messages = isAI ? appState.aiMessages : (isDevice ? deviceStore.messages : peerMessagesForCurrent())
-            // 会话常驻灵动岛：切到其他 App 也能看到新消息
-            if isAI {
-                EvoActivityManager.shared.startChat(sessionId: "ai", peerName: "AI 助手", chatType: "ai")
-            } else if isDevice {
-                EvoActivityManager.shared.startChat(sessionId: "device", peerName: "Hermes 设备", chatType: "device")
-            } else {
-                EvoActivityManager.shared.startChat(sessionId: appState.chatPeerId, peerName: appState.chatPeerName, chatType: "peer")
-            }
-        }
-        .onReceive(appState.$peerMessages) { newValue in
-            if !isAI && !isDevice {
-                let filtered = newValue.filter { $0.senderId == appState.chatPeerId }
-                if filtered != messages { messages = filtered }
-            }
-            // 有新消息 → 更新灵动岛预览（只更新对端来的）
-            if !isAI && !isDevice, let last = newValue.last, last.senderId == appState.chatPeerId {
-                EvoActivityManager.shared.updateChat(message: last.text, senderName: last.senderName.isEmpty ? "好友" : last.senderName)
-            }
-        }
-        // 连接状态监听：重连成功时显示 2 秒提示条
-        .onReceive(appState.conn.$isConnected) { connected in
-            if !isAI && connected && !prevConnected {
-                withAnimation(.easeInOut(duration: 0.3)) { showConnBanner = true }
-                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
-                    withAnimation(.easeInOut(duration: 0.3)) { showConnBanner = false }
-                }
-            }
-            prevConnected = connected
-        }
-        .onChange(of: messages) { newValue in
-            if isAI { appState.aiMessages = newValue }
-            else if isDevice { deviceStore.messages = newValue; deviceStore.save() }
-            else { writeBackPeerMessages(newValue) }
-            // 消息变化 → 灵动岛实时预览（AI 回复 / Hermes 回复）
-            if let last = newValue.last {
-                if isAI, last.role == "ai" {
-                    EvoActivityManager.shared.updateChat(message: last.text, senderName: "AI 助手")
-                } else if isDevice, last.role == "ai" {
-                    EvoActivityManager.shared.updateChat(message: last.text, senderName: "Hermes")
-                }
-            }
-        }
-        .onDisappear {
-            if isAI { appState.aiMessages = messages }
-            else if isDevice { deviceStore.messages = messages; deviceStore.save() }
-            else { writeBackPeerMessages(messages) }
-            // 关闭聊天页 → 结束会话灵动岛（回应用内继续用浮窗）
-            EvoActivityManager.shared.endChat()
-        }
     }
 
     /// 当前会话的消息（按 chatPeerId 过滤）
@@ -889,6 +838,57 @@ struct ChatView: View {
             }
         }
         .animation(.easeInOut(duration: 0.2), value: showVoiceHint)
+        .onAppear {
+            messages = isAI ? appState.aiMessages : (isDevice ? deviceStore.messages : peerMessagesForCurrent())
+            // 会话常驻灵动岛：切到其他 App 也能看到新消息
+            if isAI {
+                EvoActivityManager.shared.startChat(sessionId: "ai", peerName: "AI 助手", chatType: "ai")
+            } else if isDevice {
+                EvoActivityManager.shared.startChat(sessionId: "device", peerName: "Hermes 设备", chatType: "device")
+            } else {
+                EvoActivityManager.shared.startChat(sessionId: appState.chatPeerId, peerName: appState.chatPeerName, chatType: "peer")
+            }
+        }
+        .onReceive(appState.$peerMessages) { newValue in
+            if !isAI && !isDevice {
+                let filtered = newValue.filter { $0.senderId == appState.chatPeerId }
+                if filtered != messages { messages = filtered }
+            }
+            // 有新消息 → 更新灵动岛预览（只更新对端来的）
+            if !isAI && !isDevice, let last = newValue.last, last.senderId == appState.chatPeerId {
+                EvoActivityManager.shared.updateChat(message: last.text, senderName: last.senderName.isEmpty ? "好友" : last.senderName)
+            }
+        }
+        // 连接状态监听：重连成功时显示 2 秒提示条
+        .onReceive(appState.conn.$isConnected) { connected in
+            if !isAI && connected && !prevConnected {
+                withAnimation(.easeInOut(duration: 0.3)) { showConnBanner = true }
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    withAnimation(.easeInOut(duration: 0.3)) { showConnBanner = false }
+                }
+            }
+            prevConnected = connected
+        }
+        .onChange(of: messages) { newValue in
+            if isAI { appState.aiMessages = newValue }
+            else if isDevice { deviceStore.messages = newValue; deviceStore.save() }
+            else { writeBackPeerMessages(newValue) }
+            // 消息变化 → 灵动岛实时预览（AI 回复 / Hermes 回复）
+            if let last = newValue.last {
+                if isAI, last.role == "ai" {
+                    EvoActivityManager.shared.updateChat(message: last.text, senderName: "AI 助手")
+                } else if isDevice, last.role == "ai" {
+                    EvoActivityManager.shared.updateChat(message: last.text, senderName: "Hermes")
+                }
+            }
+        }
+        .onDisappear {
+            if isAI { appState.aiMessages = messages }
+            else if isDevice { deviceStore.messages = messages; deviceStore.save() }
+            else { writeBackPeerMessages(messages) }
+            // 关闭聊天页 → 结束会话灵动岛（回应用内继续用浮窗）
+            EvoActivityManager.shared.endChat()
+        }
     }
 }
 
