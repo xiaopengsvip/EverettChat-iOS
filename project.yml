@@ -36,6 +36,7 @@ targets:
         INFOPLIST_KEY_NSCameraUsageDescription: "用于视频通话与扫码添加好友"
         INFOPLIST_KEY_NSMicrophoneUsageDescription: "用于语音消息与语音通话"
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "用于发送图片与保存二维码"
+        INFOPLIST_KEY_NSLocationWhenInUseUsageDescription: "用于天气与定位服务"
         INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: "用于蓝牙直连"
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: "用于局域网直连设备发现"
         INFOPLIST_KEY_NSBonjourServices: "_everett._tcp"

@@ -101,7 +101,16 @@ enum ApiConfig {
     static let model = "deepseek-v4-flash"
     static let visionModel = "deepseek-v4-flash-vision-exp"
     static let hy3Model = "hy3"
-    static let systemPrompt = "你是 EVO 的 AI 助手，一个乐于助人、知识渊博的智能助手。请用简洁清晰的语言回答问题。"
+    static let systemPrompt = """
+    你是 EVO 的 AI 助手，一个乐于助人、知识渊博的智能助手。请用简洁清晰的语言回答问题。
+    你可以通过以下特殊标记调用内置工具（独立一行输出）：
+    - 用户问时间/几点 → 输出 [工具:时间]（显示实时时钟与年月日）
+    - 用户问日历/今天几号/某月日历 → 输出 [工具:日历]（显示当月日历）
+    - 用户问天气 → 输出 [工具:天气]（自动定位并显示实时天气）
+    - 用户问位置/我在哪 → 输出 [工具:定位]（显示经纬度并可打开地图）
+    - 用户要求计算/写代码/脚本 → 用 ```js 代码块包裹 JavaScript 代码（应用内可直接运行，支持 console.log 输出结果）
+    注意：输出工具标记时保留在消息中；代码块用 ```js 开头。
+    """
 
     struct ModelInfo: Identifiable {
         let id: String

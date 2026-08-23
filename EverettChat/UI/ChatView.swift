@@ -671,6 +671,12 @@ struct MessageBubble: View {
                                 .foregroundColor(Theme.textPrimary)
                                 .textSelection(.enabled)
                         }
+                        // AI 工具卡片（时间/日历/天气/定位/代码运行）
+                        if isAI, !msg.text.isEmpty {
+                            ForEach(Array(extractToolCards(from: msg.text).enumerated()), id: \.offset) { _, item in
+                                AIToolCardView(card: item.card, code: item.code)
+                            }
+                        }
                     }
                     .padding(10)
                     .frame(maxWidth: 320, alignment: .leading)
