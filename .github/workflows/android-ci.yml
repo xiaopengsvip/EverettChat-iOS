@@ -67,6 +67,7 @@ jobs:
 
       - name: Build Debug APK
         run: |
+          chmod +x gradlew
           ./gradlew assembleDebug --no-daemon 2>&1 | tail -20
           if [ ${PIPESTATUS[0]} -ne 0 ]; then
             echo "::error::BUILD FAILED"
