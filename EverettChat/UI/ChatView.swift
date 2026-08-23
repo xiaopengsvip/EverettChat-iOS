@@ -1714,7 +1714,7 @@ struct EmojiPanel: View {
     }
 }
 
-/// 消息列表（ScrollView + 气泡 + contextMenu + 自动滚动）
+/// 消息列表（ScrollView + 气泡 + contextMenu + 自动滚动 + 跳转最新）
 struct MessageListView: View {
     let messages: [ChatMessage]
     let isAI: Bool
@@ -1737,19 +1737,26 @@ struct MessageListView: View {
     let onCountChange: (ScrollViewProxy) -> Void
     let onStreamChange: (ScrollViewProxy) -> Void
 
+    // 跳转最新状态
+    @State private var contentOffsetY: CGFloat = 0     // 内容顶部相对视口偏移（向上翻为负）
+    @State private var viewportHeight: CGFloat = 0     // 视口高度
+    @State private var contentHeight: CGFloat = 0      // 内容总高度
+
     var body: some View {
         ScrollViewReader { proxy in
-            ScrollView {
-                LazyVStack(spacing: 8) {
-                    HStack(spacing: 6) {
-                        Image(systemName: isAI ? "sparkles" : "lock.shield")
-                            .font(.system(size: 10))
-                            .foregroundColor(Theme.textTertiary)
-                        Text(isAI ? "与 AI 助手对话 · 经云端中继" : "端到端加密 · 消息仅双方可见")
-                            .font(.caption2)
-                            .foregroundColor(Theme.textTertiary)
-                    }
-                    .padding(.vertical, 4)
+            GeometryReader { _ in
+                ZStack(alignment: .bottomTrailing) {
+                    ScrollView {
+                        LazyVStack(spacing: 8) {
+                            HStack(spacing: 6) {
+                                Image(systemName: isAI ? "sparkles" : "lock.shield")
+                                    .font(.system(size: 10))
+                                    .foregroundColor(Theme.textTertiary)
+                                Text(isAI ? "与 AI 助手对话 · 经云端中继" : "端到端加密 · 消息仅双方可见")
+                                    .font(.caption2)
+                                    .foregroundColor(Theme.textTertiary)
+                            }
+                            .padding(.vertical, 4)
 
                     ForEach(messages) { msg in
                         MessageBubble(
@@ -1814,16 +1821,58 @@ struct MessageListView: View {
                 }
                 .padding(.horizontal, Spacing.md)
                 .padding(.vertical, Spacing.sm)
+                .background(
+                    // 检测滚动偏移（命名坐标空间，内容顶部相对视口）
+                    GeometryReader { contentGeo in
+                        Color.clear.preference(
+                            key: ScrollOffsetKey.self,
+                            value: contentGeo.frame(in: .named("scrollSpace")).minY
+                        )
+                        .onAppear {
+                            viewportHeight = contentGeo.size.height
+                        }
+                    }
+                )
+            }
+            .coordinateSpace(name: "scrollSpace")
+            .onPreferenceChange(ScrollOffsetKey.self) { offset in
+                contentOffsetY = offset
             }
             .onChange(of: messages.count) { _ in
+                contentOffsetY = 0   // 新消息 → 回最新（隐藏按钮）
                 onCountChange(proxy)
             }
             .onChange(of: streamContent) { _ in
                 onStreamChange(proxy)
             }
-        }
-    }
-}
+
+            // 跳转最新按钮（离开底部时显示）
+            if contentOffsetY < -80 {
+                Button {
+                    withAnimation { proxy.scrollTo(messages.last?.id, anchor: .bottom) }
+                    contentOffsetY = 0
+                } label: {
+                    HStack(spacing: 5) {
+                        Image(systemName: "arrow.down")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("跳转到最新")
+                            .font(.caption)
+                    }
+                    .padding(.horizontal, 13)
+                    .padding(.vertical, 7)
+                    .background(Capsule().fill(Theme.surface.opacity(0.95)))
+                    .overlay(Capsule().stroke(Color.gray.opacity(0.35), lineWidth: 0.5))
+                    .shadow(color: Color.black.opacity(0.15), radius: 6, y: 2)
+                }
+                .buttonStyle(.plain)
+                .padding(.trailing, Spacing.md)
+                .padding(.bottom, Spacing.md)
+            }
+            }   // ZStack
+        }       // GeometryReader
+    }           // ScrollViewReader
+    }           // body
+}               // struct
 
 /// AI 模型切换行
 struct ModelSwitcherRow: View {
@@ -1890,5 +1939,17 @@ struct ForwardSheet: View {
             .navigationBarTitleDisplayMode(.inline)
         }
         .presentationDetents([.medium, .large])
+    }
+}
+
+// ============================================================
+// 跳转最新：检测滚动位置是否在底部（PreferenceKey 传递 offset）
+// ============================================================
+
+/// 滚动偏移传递：ScrollView 内容顶部相对视口的 Y 偏移
+private struct ScrollOffsetKey: PreferenceKey {
+    static var defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
