@@ -12,6 +12,31 @@ enum EvoConnectionState: String {
     case reconnecting = "重连中"
 }
 
+/// 持久连接时长（设置页选择，P1）
+enum SessionDuration: Int, CaseIterable {
+    case hours1 = 1
+    case hours6 = 6
+    case hours12 = 12
+    case hours24 = 24
+    case hours48 = 48
+    case days7 = 168
+
+    var label: String {
+        switch self {
+        case .hours1: return "1 小时"
+        case .hours6: return "6 小时"
+        case .hours12: return "12 小时"
+        case .hours24: return "24 小时"
+        case .hours48: return "48 小时"
+        case .days7: return "7 天"
+        }
+    }
+
+    static var current: SessionDuration {
+        SessionDuration(rawValue: UserDefaults.standard.integer(forKey: "session_duration_hours")) ?? .hours24
+    }
+}
+
 /// 统一 ConnectionManager（架构第三节）
 /// 数据通信优先级：LAN → P2P → Cloud
 /// - CloudTransport：RelayTransport（WS 云端中继，自动重连）
@@ -70,6 +95,16 @@ final class ConnectionManager: ObservableObject {
     func connect() {
         cloud.connect()
         state = .connecting
+        // 连接后广播 HELLO（Evo Protocol 握手）
+        DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in
+            guard let self, self.state == .cloud else { return }
+            cloud.sendRaw(type: "hello", payload: [
+                "deviceId": DeviceIdentity.shared.deviceId,
+                "deviceName": DeviceIdentity.shared.deviceName,
+                "platform": "ios",
+                "version": "1.0.0"
+            ])
+        }
     }
 
     func disconnect() {

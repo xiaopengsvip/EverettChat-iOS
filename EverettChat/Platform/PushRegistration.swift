@@ -60,6 +60,24 @@ extension PushRegistration: PKPushRegistryDelegate {
         if type == .voIP {
             voipToken = token
         }
+        // 上报 token 到云端（Push 服务器端）
+        uploadToken(token: token, type: type == .voIP ? "voip" : "apns")
+    }
+
+    /// 上报 push token 到 relay /push/register
+    private func uploadToken(token: String, type: String) {
+        guard let url = URL(string: "\(PublicRelay.httpURL)/push/register") else { return }
+        var request = URLRequest(url: url)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("Mozilla/5.0", forHTTPHeaderField: "User-Agent")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: [
+            "deviceId": DeviceIdentity.shared.deviceId,
+            "token": token,
+            "platform": "ios",
+            "type": type
+        ])
+        URLSession.shared.dataTask(with: request) { _, _, _ in }.resume()
     }
 
     func pushRegistry(_ registry: PKPushRegistry, didReceiveIncomingPushWith payload: PKPushPayload, for type: PKPushType, completion: @escaping () -> Void) {

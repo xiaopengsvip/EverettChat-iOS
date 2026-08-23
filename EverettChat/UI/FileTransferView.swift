@@ -17,6 +17,7 @@ struct FileTransferView: View {
     @State private var peers: [MCPeerID] = []
     @State private var connectedPeer: MCPeerID? = nil
     @State private var sending = false
+    @State private var transferProgress: Double = 0
     @State private var statusText = ""
     @State private var showFilePicker = false
     @State private var showPhotoPicker = false
@@ -57,6 +58,14 @@ struct FileTransferView: View {
                 .font(.caption)
                 .foregroundColor(Theme.textSecondary)
                 .padding(.horizontal)
+
+            // 传输进度条
+            if sending || transferProgress > 0 && transferProgress < 1 {
+                ProgressView(value: transferProgress)
+                    .tint(Theme.primary)
+                    .padding(.horizontal, 40)
+                    .padding(.top, 4)
+            }
 
             // 设备列表
             List {
@@ -116,6 +125,10 @@ struct FileTransferView: View {
             transfer.onReceive = { data, name in
                 statusText = "收到文件: \(name)"
             }
+            transfer.onProgress = { p in
+                transferProgress = p
+                if p >= 1 { statusText = "传输完成" }
+            }
             if mode != .nfc { scan() }
         }
         .onDisappear { transfer.disconnect() }
@@ -146,7 +159,7 @@ struct FileTransferView: View {
         guard !data.isEmpty else { return }
         sending = true
         statusText = "正在发送 \(name)..."
-        transfer.send(data, name: name) { success in
+        transfer.sendChunked(data, name: name) { success in
             sending = false
             statusText = success ? "✅ 发送成功" : "❌ 发送失败"
         }
@@ -245,7 +258,56 @@ class TransferManager: NSObject, ObservableObject {
     var onPeerDiscovered: (([MCPeerID]) -> Void)?
     var onStateChange: ((MCPeerID, Bool) -> Void)?
     var onReceive: ((Data, String) -> Void)?
+    var onProgress: ((Double) -> Void)?
     @Published var discoveredPeers: [MCPeerID] = []
+
+    // 分片接收缓存（FILE_CHUNK 协议）
+    private struct ChunkBuffer {
+        var name: String
+        var total: Int
+        var chunks: [Int: Data]
+        var received: Int
+    }
+    private var chunkBuffers: [String: ChunkBuffer] = [:]
+    private let chunkSize = 256 * 1024  // 256KB/片
+
+    // MARK: - 分片发送（大文件）
+
+    /// 分片发送文件（Evo Protocol: FILE_OFFER / FILE_CHUNK / FILE_COMPLETE）
+    func sendChunked(_ data: Data, name: String, completion: @escaping (Bool) -> Void) {
+        guard !session.connectedPeers.isEmpty else { completion(false); return }
+        let fileId = UUID().uuidString
+        let total = max(1, Int(ceil(Double(data.count) / Double(chunkSize))))
+
+        // 发送分片（串行，每片之间小延迟避免拥塞）
+        var sent = 0
+        let queue = DispatchQueue(label: "evo-chunk-send")
+        queue.async {
+            for i in 0..<total {
+                let start = i * self.chunkSize
+                let end = min(start + self.chunkSize, data.count)
+                let slice = data.subdata(in: start..<end)
+                // 格式：CHUNK|fileId|index|total|name|payload
+                var header = "CHUNK|\(fileId)|\(i)|\(total)|\(name)|".data(using: .utf8)!
+                var payload = header
+                payload.append(slice)
+                do {
+                    try self.session.send(payload, toPeers: self.session.connectedPeers, with: .reliable)
+                } catch {
+                    DispatchQueue.main.async { completion(false) }
+                    return
+                }
+                sent += 1
+                DispatchQueue.main.async {
+                    self.onProgress?(Double(sent) / Double(total))
+                }
+                if i < total - 1 {
+                    usleep(20_000)  // 20ms
+                }
+            }
+            DispatchQueue.main.async { completion(true) }
+        }
+    }
 
     override private init() {
         myPeerID = MCPeerID(displayName: "EVO-\(DeviceIdentity.shared.shortId)")
@@ -294,11 +356,49 @@ extension TransferManager: MCSessionDelegate {
     }
 
     func session(_ session: MCSession, didReceive data: Data, fromPeer peerID: MCPeerID) {
-        // 格式：文件名 + 0x00 + 文件数据
+        // 检测分片格式：CHUNK|fileId|index|total|name|payload
+        let prefix = "CHUNK|".data(using: .utf8)!
+        if data.prefix(prefix.count) == prefix {
+            var parts = data.split(separator: UInt8(ascii: "|"), maxSplits: 5, omittingEmptySubsequences: false)
+            // parts: CHUNK, fileId, index, total, name, payload(with bars)
+            guard parts.count >= 6,
+                  let fileId = String(data: parts[1], encoding: .utf8),
+                  let idx = Int(String(data: parts[2], encoding: .utf8) ?? ""),
+                  let total = Int(String(data: parts[3], encoding: .utf8) ?? ""),
+                  let name = String(data: parts[4], encoding: .utf8) else { return }
+            // payload 从第 5 个 | 之后开始
+            let headerLen = "CHUNK|\(fileId)|\(idx)|\(total)|\(name)|".data(using: .utf8)!.count
+            let chunkData = data.dropFirst(headerLen)
+
+            var buf = chunkBuffers[fileId] ?? ChunkBuffer(name: name, total: total, chunks: [:], received: 0)
+            buf.chunks[idx] = Data(chunkData)
+            buf.received += 1
+            chunkBuffers[fileId] = buf
+
+            DispatchQueue.main.async {
+                self.onProgress?(Double(buf.received) / Double(buf.total))
+            }
+
+            // 收齐 → 组装
+            if buf.received == total {
+                var full = Data()
+                for i in 0..<total {
+                    if let chunk = buf.chunks[i] {
+                        full.append(chunk)
+                    }
+                }
+                chunkBuffers.removeValue(forKey: fileId)
+                DispatchQueue.main.async {
+                    self.onReceive?(full, buf.name)
+                }
+            }
+            return
+        }
+
+        // 旧格式兼容（小文件直接发送）
         if let zero = data.firstIndex(of: 0x00) {
             let name = String(data: data[..<zero], encoding: .utf8) ?? "unknown"
             let fileData = data[data.index(after: zero)...]
-            receivedData = Data(fileData)
             DispatchQueue.main.async {
                 self.onReceive?(Data(fileData), name)
             }

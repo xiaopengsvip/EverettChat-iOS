@@ -11,6 +11,7 @@ struct SettingsView: View {
     @State private var restoreResult: String? = nil
     @State private var showMyQr = false
     @State private var webURL: URL?
+    @State private var showSessionPicker = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -76,6 +77,8 @@ struct SettingsView: View {
                         Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
                         SettingRow(icon: "🔋", title: "后台保活", subtitle: "前台保活 · 电池优化白名单") {}
                         Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
+                        SettingRow(icon: "🔗", title: "连接保持", subtitle: SessionDuration.current.label) { showSessionPicker = true }
+                        Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
                         SettingRow(icon: "🛰", title: "中继服务器", subtitle: "已配置 · \(PublicRelay.httpURL)") {}
                         Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
                         // 自动删除消息（TTL）
@@ -85,6 +88,11 @@ struct SettingsView: View {
                         }
                         Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
                         SettingRow(icon: "📝", title: "反馈", subtitle: "问题与建议") {}
+                    }
+
+                    sectionHeader("存储")
+                    settingsCard {
+                        SettingRow(icon: "💾", title: "存储管理", subtitle: "分类占用 · 清理缓存") { showStorageManager = true }
                     }
 
                     sectionHeader("身份")
@@ -150,6 +158,16 @@ struct SettingsView: View {
             Button("取消", role: .cancel) {}
         } message: {
             Text(restoreResult ?? "输入之前保存的恢复密钥")
+        }
+        // 连接保持时长选择
+        .confirmationDialog("连接保持时长", isPresented: $showSessionPicker, titleVisibility: .visible) {
+            ForEach(SessionDuration.allCases, id: \.rawValue) { d in
+                Button(d.label) {
+                    UserDefaults.standard.set(d.rawValue, forKey: "session_duration_hours")
+                    appState.objectWillChange.send()
+                }
+            }
+            Button("取消", role: .cancel) {}
         }
         // 自动删除天数选择
         .confirmationDialog("自动删除消息", isPresented: $showAutoDelete, titleVisibility: .visible) {

@@ -21,11 +21,21 @@ final class WebRTCEngine: NSObject, ObservableObject {
     private var conn: ConnectionManager { ConnectionManager.shared }
     private var videoEnabled = false
 
-    // STUN（公共）
-    private let iceServers: [RTCIceServer] = [
-        RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302"]),
-        RTCIceServer(urlStrings: ["stun:stun1.l.google.com:19302"])
-    ]
+    // STUN（公共）+ TURN（可配置，P2P 失败时兜底）
+    private var iceServers: [RTCIceServer] {
+        var servers = [
+            RTCIceServer(urlStrings: ["stun:stun.l.google.com:19302"]),
+            RTCIceServer(urlStrings: ["stun:stun1.l.google.com:19302"])
+        ]
+        // TURN：部署 coturn 后填入（UserDefaults 可配置）
+        if let turnURL = UserDefaults.standard.string(forKey: "turn_url"),
+           !turnURL.isEmpty {
+            let user = UserDefaults.standard.string(forKey: "turn_user") ?? ""
+            let pass = UserDefaults.standard.string(forKey: "turn_pass") ?? ""
+            servers.append(RTCIceServer(urlStrings: [turnURL], username: user, credential: pass))
+        }
+        return servers
+    }
 
     private override init() {
         super.init()
