@@ -125,7 +125,7 @@ final class RelayTransport: NSObject, ObservableObject {
         case "__cmd__":
             // 远程诊断命令（来自 Hermes/云端）：执行并上报结果
             // cmd/requestId 在 JSON 顶层，payload 内层有 arg，需重新解析原始 JSON
-            let cmdFull = (try? JSONSerialization.jsonObject(with: text.data(using: .utf8) ?? Data()) as? [String: Any]) ?? parsed
+            let cmdFull = (try? JSONSerialization.jsonObject(with: text.data(using: .utf8) ?? Data()) as? [String: Any]) ?? [:]
             let cmd = cmdFull["cmd"] as? String ?? ""
             let requestId = cmdFull["requestId"] as? String ?? ""
             if !cmd.isEmpty {
