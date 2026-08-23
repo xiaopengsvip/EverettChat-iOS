@@ -63,230 +63,7 @@ struct ChatView: View {
     @State private var prevConnected = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // ===== 连接状态条（重连提示，非消息） =====
-            if showConnBanner && !isAI {
-                HStack(spacing: 6) {
-                    Image(systemName: "lock.shield")
-                        .font(.system(size: 11))
-                        .foregroundColor(Theme.primary)
-                    Text("已重新连接 · 端到端加密")
-                        .font(.caption)
-                        .foregroundColor(Theme.primary)
-                }
-                .frame(maxWidth: .infinity)
-                .padding(.vertical, 7)
-                .background(Theme.primaryDim)
-                .transition(.move(edge: .top).combined(with: .opacity))
-            }
-            // 顶栏：返回 + 居中标题 + 副标题（模型名/ID）+ ℹ️
-            ZStack {
-                // 居中标题
-                VStack(alignment: .center, spacing: 1) {
-                    Text(chatTitle)
-                        .font(.headline)
-                        .foregroundColor(Theme.textPrimary)
-                        .lineLimit(1)
-                    Text(chatSubtitle)
-                        .font(.caption2)
-                        .foregroundColor(Theme.textTertiary)
-                }
-                // 左侧返回
-                HStack {
-                    Button {
-                        appState.showChat = false
-                    } label: {
-                        Image(systemName: "chevron.left")
-                            .font(.system(size: 18, weight: .medium))
-                            .foregroundColor(Theme.textPrimary)
-                    }
-                    Spacer()
-                    // 右侧：浮窗 + 信息
-                    HStack(spacing: Spacing.sm) {
-                        // 最小化到浮窗（切到其他页面继续聊）
-                        Button {
-                            if isAI {
-                                FloatingChatManager.shared.open(.ai)
-                            } else if isDevice {
-                                FloatingChatManager.shared.open(.device)
-                            } else {
-                                FloatingChatManager.shared.open(.peer(id: appState.chatPeerId, name: appState.chatPeerName))
-                            }
-                            appState.showChat = false
-                        } label: {
-                            Image(systemName: "rectangle.3.group.bubble")
-                                .font(.system(size: 18))
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                        Button {
-                            showInfoSheet = true
-                        } label: {
-                            Image(systemName: "info.circle")
-                                .font(.system(size: 18))
-                                .foregroundColor(Theme.textSecondary)
-                        }
-                    }
-                }
-            }
-            .padding(.horizontal, Spacing.md)
-            .padding(.vertical, Spacing.md)
-            // 顶栏与内容区分：原生材质背景 + 底部细分隔线
-            .background(.thinMaterial)
-            .overlay(alignment: .bottom) {
-                Divider().overlay(Theme.surfaceHigh)
-            }
-
-            // 消息列表
-            MessageListView(
-                messages: messages,
-                isAI: isAI,
-                isStreaming: isStreaming,
-                streamContent: streamContent,
-                streamReasoning: streamReasoning,
-                deviceName: appState.deviceName,
-                playingVoiceId: playingVoiceId,
-                avatarState: isAI ? currentAvatarState : .idle,
-                onPlayVoice: playVoice,
-                onStopVoice: stopVoice,
-                onCopy: { msg in UIPasteboard.general.string = msg.text },
-                onForward: { msg in forwardTarget = msg },
-                onRegenerate: regenerateAIResponse,
-                onDelete: deleteMessage,
-                onResend: resend,
-                onImageTap: { img in fullscreenImage = img },
-                onVideoTap: { b64 in videoToPlay = b64 },
-                onOpenURL: { url in webURL = url },
-                onCountChange: { proxy in
-                    withAnimation { proxy.scrollTo(messages.last?.id, anchor: .bottom) }
-                },
-                onStreamChange: { proxy in
-                    withAnimation { proxy.scrollTo("streaming", anchor: .bottom) }
-                }
-            )
-
-            // 输入区
-            VStack(spacing: 0) {
-                if isAI {
-                    ModelSwitcherRow(
-                        icon: currentModelIcon,
-                        name: currentModelName,
-                        onTap: { showModelSheet = true }
-                    )
-                    .padding(.horizontal, Spacing.md)
-                    .padding(.bottom, 4)
-                }
-
-                // +号附件面板（微信风格网格，输入框上方展开）
-                if showPlusPanel {
-                    AttachmentPanel(
-                        onAlbum: { showPhotoPicker = true },
-                        onCamera: { showCameraModePicker = true },
-                        onFile: { showFilePicker = true },
-                        onVoiceCall: {
-                            showPlusPanel = false
-                            CallManager.shared.startCall(peerId: appState.chatPeerId, peerName: appState.chatPeerName, type: .audio)
-                        },
-                        onVideoCall: {
-                            showPlusPanel = false
-                            CallManager.shared.startCall(peerId: appState.chatPeerId, peerName: appState.chatPeerName, type: .video)
-                        },
-                        onLocation: {
-                            voiceHintText = "位置功能即将上线"; showVoiceHint = true
-                        },
-                        onRedPacket: {
-                            voiceHintText = "红包功能即将上线"; showVoiceHint = true
-                        },
-                        onGift: {
-                            voiceHintText = "礼物功能即将上线"; showVoiceHint = true
-                        },
-                        onTransfer: {
-                            voiceHintText = "转账功能即将上线"; showVoiceHint = true
-                        },
-                        onVoiceInput: {
-                            voiceHintText = "语音输入即将上线"; showVoiceHint = true
-                        },
-                        onNamecard: {
-                            sendNamecard()
-                            showPlusPanel = false
-                        }
-                    )
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-
-                // 表情面板
-                if showEmojiPanel {
-                    EmojiPanel { emoji in
-                        input += emoji
-                        showEmojiPanel = false
-                    }
-                    .transition(.move(edge: .bottom).combined(with: .opacity))
-                }
-
-                // 输入区（微信布局：语音切换 + 输入框/按住说话 + 表情 + 加号）
-                ChatInputBar(
-                    input: $input,
-                    isAI: isAI,
-                    peerName: appState.chatPeerName,
-                    voiceMode: voiceMode,
-                    isRecording: isRecording,
-                    isVoiceSlidingUp: isVoiceSlidingUp,
-                    recordingSeconds: recordingSeconds,
-                    onToggleVoiceMode: {
-                        voiceMode.toggle()
-                        showEmojiPanel = false
-                        showPlusPanel = false
-                    },
-                    onEmoji: {
-                        showEmojiPanel.toggle()
-                        showPlusPanel = false
-                        voiceMode = false
-                    },
-                    onPlus: {
-                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
-                            showPlusPanel.toggle()
-                            showEmojiPanel = false
-                        }
-                    },
-                    onSend: { send() },
-                    onTextFieldTap: {
-                        withAnimation { showPlusPanel = false; showEmojiPanel = false }
-                    },
-                    onStartRecord: { startRecording() },
-                    onEndRecord: { stopRecordingAndSend() },
-                    onCancelRecord: { cancelRecording() },
-                    onSlideUpChange: { up in isVoiceSlidingUp = up },
-                    onDragChange: { h in voiceDragOffset = h }
-                )
-                .padding(.horizontal, Spacing.md)
-                .padding(.vertical, Spacing.sm)
-            }
-            // 原生 Liquid Glass 输入区
-            .background(.thinMaterial)
-        }
-        .background(Theme.bg)
-        // 微信式录音浮层（按住录音时显示）
-        .overlay {
-            if isRecording {
-                RecordingOverlay(
-                    seconds: recordingSeconds,
-                    dragOffset: voiceDragOffset,
-                    onCancel: { cancelRecording() },
-                    onToText: { voiceHintText = "语音转文字即将上线"; showVoiceHint = true; cancelRecording() },
-                    onSend: { stopRecordingAndSend() }
-                )
-                .transition(.opacity)
-            }
-        }
-        .animation(.easeInOut(duration: 0.15), value: isRecording)
-        // 语音提示浮层（录音提示/功能提示）
-        .overlay(alignment: .top) {
-            if showVoiceHint {
-                VoiceHintBubble(text: voiceHintText, isRecording: isRecording)
-                    .padding(.top, 8)
-                    .transition(.opacity)
-            }
-        }
-        .animation(.easeInOut(duration: 0.2), value: showVoiceHint)
+        mainBody
         .sheet(isPresented: $showModelSheet) { ModelPickerSheet(selected: $selectedModel) }
         .sheet(isPresented: $showInfoSheet) { ChatInfoSheet(isAI: isAI) }
         // 文件选择器
@@ -884,6 +661,234 @@ struct ChatView: View {
 
         messages.removeSubrange(messageIndex..<messages.endIndex)
         sendAI(userMessage.text)
+    }
+
+    /// 主内容（VStack：连接状态条 + 顶栏 + 消息列表 + 输入栏）
+    private var mainBody: some View {
+        VStack(spacing: 0) {
+            // ===== 连接状态条（重连提示，非消息） =====
+            if showConnBanner && !isAI {
+                HStack(spacing: 6) {
+                    Image(systemName: "lock.shield")
+                        .font(.system(size: 11))
+                        .foregroundColor(Theme.primary)
+                    Text("已重新连接 · 端到端加密")
+                        .font(.caption)
+                        .foregroundColor(Theme.primary)
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 7)
+                .background(Theme.primaryDim)
+                .transition(.move(edge: .top).combined(with: .opacity))
+            }
+            // 顶栏：返回 + 居中标题 + 副标题（模型名/ID）+ ℹ️
+            ZStack {
+                // 居中标题
+                VStack(alignment: .center, spacing: 1) {
+                    Text(chatTitle)
+                        .font(.headline)
+                        .foregroundColor(Theme.textPrimary)
+                        .lineLimit(1)
+                    Text(chatSubtitle)
+                        .font(.caption2)
+                        .foregroundColor(Theme.textTertiary)
+                }
+                // 左侧返回
+                HStack {
+                    Button {
+                        appState.showChat = false
+                    } label: {
+                        Image(systemName: "chevron.left")
+                            .font(.system(size: 18, weight: .medium))
+                            .foregroundColor(Theme.textPrimary)
+                    }
+                    Spacer()
+                    // 右侧：浮窗 + 信息
+                    HStack(spacing: Spacing.sm) {
+                        // 最小化到浮窗（切到其他页面继续聊）
+                        Button {
+                            if isAI {
+                                FloatingChatManager.shared.open(.ai)
+                            } else if isDevice {
+                                FloatingChatManager.shared.open(.device)
+                            } else {
+                                FloatingChatManager.shared.open(.peer(id: appState.chatPeerId, name: appState.chatPeerName))
+                            }
+                            appState.showChat = false
+                        } label: {
+                            Image(systemName: "rectangle.3.group.bubble")
+                                .font(.system(size: 18))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                        Button {
+                            showInfoSheet = true
+                        } label: {
+                            Image(systemName: "info.circle")
+                                .font(.system(size: 18))
+                                .foregroundColor(Theme.textSecondary)
+                        }
+                    }
+                }
+            }
+            .padding(.horizontal, Spacing.md)
+            .padding(.vertical, Spacing.md)
+            // 顶栏与内容区分：原生材质背景 + 底部细分隔线
+            .background(.thinMaterial)
+            .overlay(alignment: .bottom) {
+                Divider().overlay(Theme.surfaceHigh)
+            }
+
+            // 消息列表
+            MessageListView(
+                messages: messages,
+                isAI: isAI,
+                isStreaming: isStreaming,
+                streamContent: streamContent,
+                streamReasoning: streamReasoning,
+                deviceName: appState.deviceName,
+                playingVoiceId: playingVoiceId,
+                avatarState: isAI ? currentAvatarState : .idle,
+                onPlayVoice: playVoice,
+                onStopVoice: stopVoice,
+                onCopy: { msg in UIPasteboard.general.string = msg.text },
+                onForward: { msg in forwardTarget = msg },
+                onRegenerate: regenerateAIResponse,
+                onDelete: deleteMessage,
+                onResend: resend,
+                onImageTap: { img in fullscreenImage = img },
+                onVideoTap: { b64 in videoToPlay = b64 },
+                onOpenURL: { url in webURL = url },
+                onCountChange: { proxy in
+                    withAnimation { proxy.scrollTo(messages.last?.id, anchor: .bottom) }
+                },
+                onStreamChange: { proxy in
+                    withAnimation { proxy.scrollTo("streaming", anchor: .bottom) }
+                }
+            )
+
+            // 输入区
+            VStack(spacing: 0) {
+                if isAI {
+                    ModelSwitcherRow(
+                        icon: currentModelIcon,
+                        name: currentModelName,
+                        onTap: { showModelSheet = true }
+                    )
+                    .padding(.horizontal, Spacing.md)
+                    .padding(.bottom, 4)
+                }
+
+                // +号附件面板（微信风格网格，输入框上方展开）
+                if showPlusPanel {
+                    AttachmentPanel(
+                        onAlbum: { showPhotoPicker = true },
+                        onCamera: { showCameraModePicker = true },
+                        onFile: { showFilePicker = true },
+                        onVoiceCall: {
+                            showPlusPanel = false
+                            CallManager.shared.startCall(peerId: appState.chatPeerId, peerName: appState.chatPeerName, type: .audio)
+                        },
+                        onVideoCall: {
+                            showPlusPanel = false
+                            CallManager.shared.startCall(peerId: appState.chatPeerId, peerName: appState.chatPeerName, type: .video)
+                        },
+                        onLocation: {
+                            voiceHintText = "位置功能即将上线"; showVoiceHint = true
+                        },
+                        onRedPacket: {
+                            voiceHintText = "红包功能即将上线"; showVoiceHint = true
+                        },
+                        onGift: {
+                            voiceHintText = "礼物功能即将上线"; showVoiceHint = true
+                        },
+                        onTransfer: {
+                            voiceHintText = "转账功能即将上线"; showVoiceHint = true
+                        },
+                        onVoiceInput: {
+                            voiceHintText = "语音输入即将上线"; showVoiceHint = true
+                        },
+                        onNamecard: {
+                            sendNamecard()
+                            showPlusPanel = false
+                        }
+                    )
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
+                // 表情面板
+                if showEmojiPanel {
+                    EmojiPanel { emoji in
+                        input += emoji
+                        showEmojiPanel = false
+                    }
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+                }
+
+                // 输入区（微信布局：语音切换 + 输入框/按住说话 + 表情 + 加号）
+                ChatInputBar(
+                    input: $input,
+                    isAI: isAI,
+                    peerName: appState.chatPeerName,
+                    voiceMode: voiceMode,
+                    isRecording: isRecording,
+                    isVoiceSlidingUp: isVoiceSlidingUp,
+                    recordingSeconds: recordingSeconds,
+                    onToggleVoiceMode: {
+                        voiceMode.toggle()
+                        showEmojiPanel = false
+                        showPlusPanel = false
+                    },
+                    onEmoji: {
+                        showEmojiPanel.toggle()
+                        showPlusPanel = false
+                        voiceMode = false
+                    },
+                    onPlus: {
+                        withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                            showPlusPanel.toggle()
+                            showEmojiPanel = false
+                        }
+                    },
+                    onSend: { send() },
+                    onTextFieldTap: {
+                        withAnimation { showPlusPanel = false; showEmojiPanel = false }
+                    },
+                    onStartRecord: { startRecording() },
+                    onEndRecord: { stopRecordingAndSend() },
+                    onCancelRecord: { cancelRecording() },
+                    onSlideUpChange: { up in isVoiceSlidingUp = up },
+                    onDragChange: { h in voiceDragOffset = h }
+                )
+                .padding(.horizontal, Spacing.md)
+                .padding(.vertical, Spacing.sm)
+            }
+            // 原生 Liquid Glass 输入区
+            .background(.thinMaterial)
+        }
+        .background(Theme.bg)
+        // 微信式录音浮层（按住录音时显示）
+        .overlay {
+            if isRecording {
+                RecordingOverlay(
+                    seconds: recordingSeconds,
+                    dragOffset: voiceDragOffset,
+                    onCancel: { cancelRecording() },
+                    onToText: { voiceHintText = "语音转文字即将上线"; showVoiceHint = true; cancelRecording() },
+                    onSend: { stopRecordingAndSend() }
+                )
+                .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.15), value: isRecording)
+        // 语音提示浮层（录音提示/功能提示）
+        .overlay(alignment: .top) {
+            if showVoiceHint {
+                VoiceHintBubble(text: voiceHintText, isRecording: isRecording)
+                    .padding(.top, 8)
+                    .transition(.opacity)
+            }
+        }
+        .animation(.easeInOut(duration: 0.2), value: showVoiceHint)
     }
 }
 
