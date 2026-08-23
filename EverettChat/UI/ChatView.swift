@@ -195,6 +195,9 @@ struct ChatView: View {
                         }
                     },
                     onSend: { send() },
+                    onTextFieldTap: {
+                        withAnimation { showPlusPanel = false; showEmojiPanel = false }
+                    },
                     onStartRecord: { startRecording() },
                     onEndRecord: { stopRecordingAndSend() },
                     onCancelRecord: { cancelRecording() },
@@ -558,6 +561,7 @@ struct MessageBubble: View {
     let playingVoiceId: String?
     let onPlayVoice: (ChatMessage) -> Void
     let onStopVoice: () -> Void
+    @State private var isReasoningExpanded = false
 
     /// 送达状态图标（自己发的消息：✓ 已发送 / ✓✓ 已送达 / ! 失败）
     @ViewBuilder
@@ -610,9 +614,38 @@ struct MessageBubble: View {
                 if isAI {
                     VStack(alignment: .leading, spacing: 4) {
                         if !msg.reasoning.isEmpty {
-                            Text("🤔 思考过程 ▸")
-                                .font(.caption2)
-                                .foregroundColor(Theme.textTertiary)
+                            // 思考过程：可展开/折叠
+                            Button {
+                                withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) {
+                                    isReasoningExpanded.toggle()
+                                }
+                            } label: {
+                                HStack(spacing: 4) {
+                                    Image(systemName: "brain.head.profile")
+                                        .font(.system(size: 11))
+                                        .foregroundColor(Theme.textTertiary)
+                                    Text(isReasoningExpanded ? "思考过程 ▾" : "思考过程 ▸")
+                                        .font(.caption2)
+                                        .foregroundColor(Theme.textTertiary)
+                                    Spacer()
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+
+                            if isReasoningExpanded {
+                                Text(msg.reasoning)
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textTertiary)
+                                    .textSelection(.enabled)
+                                    .padding(8)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: Radius.small)
+                                            .fill(Theme.surfaceAlt.opacity(0.6))
+                                    )
+                                    .transition(.opacity.combined(with: .move(edge: .top)))
+                            }
                         }
                         if !msg.imageBase64.isEmpty, let data = Data(base64Encoded: msg.imageBase64), let ui = UIImage(data: data) {
                             Image(uiImage: ui)
@@ -848,6 +881,7 @@ struct ChatInputBar: View {
     let onEmoji: () -> Void
     let onPlus: () -> Void
     let onSend: () -> Void
+    let onTextFieldTap: () -> Void
     let onStartRecord: () -> Void
     let onEndRecord: () -> Void
     let onCancelRecord: () -> Void
@@ -875,6 +909,15 @@ struct ChatInputBar: View {
                         RoundedRectangle(cornerRadius: 20)
                             .fill(isRecording ? (isVoiceSlidingUp ? Theme.error.opacity(0.15) : Theme.primary.opacity(0.15)) : Theme.surfaceHigh)
                     )
+                    .overlay(alignment: isRecording ? .trailing : .leading) {
+                        if isRecording {
+                            Text(String(format: " %.1f\"", recordingSeconds))
+                                .font(.caption.monospacedDigit())
+                                .foregroundColor(isVoiceSlidingUp ? Theme.error : Theme.primary)
+                                .padding(.trailing, 10)
+                                .transition(.opacity)
+                        }
+                    }
                     .gesture(
                         LongPressGesture(minimumDuration: 0.15)
                             .sequenced(before: DragGesture(minimumDistance: 0))
@@ -918,6 +961,8 @@ struct ChatInputBar: View {
                     .background(RoundedRectangle(cornerRadius: 20).fill(Theme.surfaceHigh))
                     .submitLabel(.send)
                     .onSubmit(onSend)
+                    // 点击输入框 → 收回附件/表情面板
+                    .simultaneousGesture(TapGesture().onEnded { onTextFieldTap() })
             }
 
             // 表情按钮
