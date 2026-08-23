@@ -102,12 +102,14 @@ final class RelayTransport: NSObject, ObservableObject {
         case "welcome":
             isConnected = true
             reconnectAttempts = 0
-            peerName = parsed.payload["peer"] as? String ?? "对端"
+            // welcome 的 peer 字段是发送方自己的名字，不是对端名称
+            // peerName 只通过 peer-joined 事件获取
             onStatusChange?(true)
             startHeartbeat()
-            DiagAgent.shared.log("info", "relay connected, peer=\(peerName)")
+            DiagAgent.shared.log("info", "relay connected")
         case "peer-joined":
-            peerName = parsed.payload["peer"] as? String ?? "对端"
+            peerName = parsed.payload["name"] as? String ?? "对端"
+            onStatusChange?(true)
         case "online-users":
             if let users = parsed.payload["users"] as? [[String: Any]] {
                 onlineUsers = users.compactMap { u in
