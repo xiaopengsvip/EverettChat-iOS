@@ -19,12 +19,11 @@ struct PageTitleBar: View {
                 Spacer()
                 if let trailing {
                     trailing
-                } else {
-                    // 占位：无按钮时也保持标题栏高度一致（与有按钮页相同）
-                    Color.clear.frame(width: 32, height: 32)
                 }
             }
         }
+        // 固定标题栏最小高度（32pt = 按钮高度），无按钮页不塌陷，四页高度一致
+        .frame(minHeight: 32)
         .padding(.horizontal, Spacing.lg)
         .padding(.vertical, Spacing.sm)
         // 顶栏与内容区分：深一层的背景色 + 可见分割线

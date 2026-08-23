@@ -995,8 +995,10 @@ struct AttachmentPanel: View {
                 gridPage(page1).tag(0)
                 gridPage(page2).tag(1)
             }
-            .tabViewStyle(.page(indexDisplayMode: page2.isEmpty ? .never : .always))
-            .frame(height: 150)
+            // 页面指示器用自定义点，TabView 自身不占额外高度
+            .tabViewStyle(.page(indexDisplayMode: .never))
+            // 两行格子：56 图标 + 8 间距 + 18 文字 = 82/行 ×2 + 14 行距 = 178pt，给足 190
+            .frame(height: 190)
 
             // 页码指示点
             if !page2.isEmpty {
@@ -1018,7 +1020,7 @@ struct AttachmentPanel: View {
     }
 
     private func gridPage(_ items: [AttachmentItemData]) -> some View {
-        LazyVGrid(columns: columns, spacing: 14) {
+        LazyVGrid(columns: columns, spacing: 20) {
             ForEach(items) { item in
                 AttachmentItem(icon: item.icon, color: item.color, label: item.label, action: item.action)
             }
