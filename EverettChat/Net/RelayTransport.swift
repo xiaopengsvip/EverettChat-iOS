@@ -1,4 +1,5 @@
 import Foundation
+import CryptoKit
 
 /// 中继传输层（WebSocket → Cloudflare Workers，与 Android 版协议兼容）
 /// 自动重连（指数退避）+ 心跳保活 + 定向路由（target）
