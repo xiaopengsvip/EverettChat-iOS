@@ -120,11 +120,13 @@ final class ProfileStore: ObservableObject {
                 signature: json["signature"] as? String ?? ""
             )
             DispatchQueue.main.async {
-                self?.friendProfiles[deviceId] = profile
-                if let count = self?.friendProfiles.count, count > self?.cacheLimit ?? 200 {
-                    self?.friendProfiles.removeAll { $0.key == self?.friendProfiles.keys.first }
+                guard let self else { return }
+                self.friendProfiles[deviceId] = profile
+                if self.friendProfiles.count > self.cacheLimit,
+                   let first = self.friendProfiles.keys.first {
+                    self.friendProfiles.removeValue(forKey: first)
                 }
-                self?.save()
+                self.save()
             }
         }.resume()
     }
@@ -140,16 +142,5 @@ final class ProfileStore: ObservableObject {
     var myAvatarImage: UIImage? {
         guard !myProfile.avatar.isEmpty, let data = Data(base64Encoded: myProfile.avatar) else { return nil }
         return UIImage(data: data)
-    }
-}
-
-extension UIImage {
-    func resized(maxSide: CGFloat) -> UIImage {
-        let scale = min(maxSide / size.width, maxSide / size.height, 1.0)
-        let newSize = CGSize(width: size.width * scale, height: size.height * scale)
-        let renderer = UIGraphicsImageRenderer(size: newSize)
-        return renderer.image { _ in
-            self.draw(in: CGRect(origin: .zero, size: newSize))
-        }
     }
 }
