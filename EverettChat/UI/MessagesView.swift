@@ -97,9 +97,21 @@ struct MessagesView: View {
     }
 
     static func formatTime(_ date: Date) -> String {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "HH:mm"
-        return formatter.string(from: date)
+        // 智能时间：刚刚 / 今天 HH:mm / 今年 M月d日 HH:mm / 跨年 yyyy/M/d
+        let cal = Calendar.current
+        let now = Date()
+        if date.timeIntervalSince(now) > -60 && date <= now.addingTimeInterval(60) {
+            return "刚刚"
+        }
+        let f = DateFormatter()
+        if cal.isDateInToday(date) {
+            f.dateFormat = "HH:mm"
+        } else if cal.isDate(date, equalTo: now, toGranularity: .year) {
+            f.dateFormat = "M月d日"
+        } else {
+            f.dateFormat = "yyyy/M/d"
+        }
+        return f.string(from: date)
     }
 }
 

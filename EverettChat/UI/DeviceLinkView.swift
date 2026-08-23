@@ -110,33 +110,54 @@ struct DeviceLinkView: View {
                     .disabled(connecting || host.isEmpty)
                 }
 
-                // 对话区
+                // 对话区（自动滚动到最新消息）
                 if store.isConnected {
-                    Section("AI 对话（Hermes）") {
-                        ForEach(store.messages) { msg in
-                            VStack(alignment: msg.isUser ? .trailing : .leading, spacing: 4) {
-                                Text(msg.isUser ? "你" : "Hermes")
-                                    .font(.caption2)
-                                    .foregroundColor(.secondary)
-                                Text(msg.content)
-                                    .font(.body)
-                                    .foregroundColor(.primary)
-                                    .textSelection(.enabled)
-                                    .padding(.horizontal, 12)
-                                    .padding(.vertical, 8)
-                                    .background(msg.isUser ? Color.accentColor.opacity(0.15) : Color(.tertiarySystemFill))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
+                    Section {
+                        ScrollViewReader { proxy in
+                            ScrollView {
+                                LazyVStack(spacing: 8) {
+                                    ForEach(store.messages) { msg in
+                                        VStack(alignment: msg.isUser ? .trailing : .leading, spacing: 4) {
+                                            Text(msg.isUser ? "你" : "Hermes")
+                                                .font(.caption2)
+                                                .foregroundColor(.secondary)
+                                            Text(msg.content)
+                                                .font(.body)
+                                                .foregroundColor(.primary)
+                                                .textSelection(.enabled)
+                                                .padding(.horizontal, 12)
+                                                .padding(.vertical, 8)
+                                                .background(msg.isUser ? Color.accentColor.opacity(0.15) : Color(.tertiarySystemFill))
+                                                .clipShape(RoundedRectangle(cornerRadius: 12))
+                                        }
+                                        .id(msg.id)
+                                    }
+                                    if isSending {
+                                        HStack {
+                                            ProgressView()
+                                                .scaleEffect(0.7)
+                                            Text("思考中...")
+                                                .font(.caption)
+                                                .foregroundColor(.secondary)
+                                        }
+                                        .id("sending")
+                                    }
+                                }
+                                .padding(.horizontal, 4)
+                            }
+                            .frame(minHeight: 200)
+                            .onChange(of: store.messages.count) { _ in
+                                withAnimation {
+                                    if let last = store.messages.last {
+                                        proxy.scrollTo(last.id, anchor: .bottom)
+                                    }
+                                }
                             }
                         }
-                        if isSending {
-                            HStack {
-                                ProgressView()
-                                    .scaleEffect(0.7)
-                                Text("思考中...")
-                                    .font(.caption)
-                                    .foregroundColor(.secondary)
-                            }
-                        }
+                        .listRowInsets(EdgeInsets())
+                        .listRowBackground(Color.clear)
+                    } header: {
+                        Text("AI 对话（Hermes）")
                     }
 
                     Section {
@@ -216,7 +237,11 @@ struct DeviceLinkView: View {
                 store.modelName = models.first?["id"] as? String ?? "Hermes"
                 statusText = "已连接 \(store.modelName)"
                 // 默认问候
-                store.messages = [ChatMsg(content: "已连接到 Hermes Agent（\(store.modelName)），可以开始对话了 ✨", isUser: false)]
+                if store.messages.isEmpty {
+                    store.messages = [ChatMsg(content: "已连接到 Hermes Agent（\(store.modelName)），可以开始对话了 ✨", isUser: false)]
+                    store.lastMessageTime = Date()
+                }
+                store.save()
             }
         }.resume()
     }
@@ -256,38 +281,41 @@ struct DeviceLinkView: View {
         directSession.dataTask(with: req) { data, _, error in
             DispatchQueue.main.async {
                 isSending = false
+                let appendAndSave: (ChatMsg) -> Void = { msg in
+                    store.messages.append(msg)
+                    store.lastMessageTime = Date()
+                    store.save()
+                }
                 if let error = error {
-                    store.messages.append(ChatMsg(content: "请求失败: \(error.localizedDescription)", isUser: false))
+                    appendAndSave(ChatMsg(content: "请求失败: \(error.localizedDescription)", isUser: false))
                     return
                 }
                 guard let data = data,
                       let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
                     // 显示原始响应片段，便于诊断
                     let raw = data.map { String(data: $0, encoding: .utf8) ?? "非文本响应" } ?? "无响应数据"
-                    store.messages.append(ChatMsg(content: "响应解析失败（原始: \(String(raw.prefix(200)))）", isUser: false))
+                    appendAndSave(ChatMsg(content: "响应解析失败（原始: \(String(raw.prefix(200)))）", isUser: false))
                     return
                 }
                 // OpenAI 错误信封
                 if let err = json["error"] as? [String: Any],
                    let errMsg = err["message"] as? String {
-                    store.messages.append(ChatMsg(content: "Hermes 错误: \(errMsg)", isUser: false))
+                    appendAndSave(ChatMsg(content: "Hermes 错误: \(errMsg)", isUser: false))
                     return
                 }
                 guard let choices = json["choices"] as? [[String: Any]],
                       let msg = choices.first?["message"] as? [String: Any] else {
-                    store.messages.append(ChatMsg(content: "响应格式异常: \(String(describing: json).prefix(200))", isUser: false))
+                    appendAndSave(ChatMsg(content: "响应格式异常: \(String(describing: json).prefix(200))", isUser: false))
                     return
                 }
                 // content 可能为 null（纯工具调用/思考），宽容处理
                 if let content = msg["content"] as? String, !content.isEmpty {
-                    store.messages.append(ChatMsg(content: content, isUser: false))
+                    appendAndSave(ChatMsg(content: content, isUser: false))
                 } else if let reasoning = msg["reasoning_content"] as? String, !reasoning.isEmpty {
-                    store.messages.append(ChatMsg(content: "（思考中）\(reasoning)", isUser: false))
+                    appendAndSave(ChatMsg(content: "（思考中）\(reasoning)", isUser: false))
                 } else {
-                    store.messages.append(ChatMsg(content: "（Hermes 无文本输出，可能正在调用工具）", isUser: false))
+                    appendAndSave(ChatMsg(content: "（Hermes 无文本输出，可能正在调用工具）", isUser: false))
                 }
-                store.lastMessageTime = Date()
-                store.save()
             }
         }.resume()
     }
