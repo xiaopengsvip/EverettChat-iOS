@@ -83,7 +83,7 @@ struct ChatView: View {
             ZStack {
                 // 居中标题
                 VStack(alignment: .center, spacing: 1) {
-                    Text(isAI ? "AI 助手" : isDevice ? "Hermes 设备" : appState.chatPeerName)
+                    Text(chatTitle)
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
                         .lineLimit(1)
@@ -490,6 +490,12 @@ struct ChatView: View {
     }
     private var currentModelName: String { currentModel.name }
     private var currentModelIcon: String { currentModel.vision ? "eye.fill" : "sparkles" }
+    /// 顶栏标题（拆开避免编译器类型检查超时）
+    private var chatTitle: String {
+        if isAI { return "AI 助手" }
+        if isDevice { return "Hermes 设备" }
+        return appState.chatPeerName
+    }
     /// 顶栏副标题（拆开避免编译器类型检查超时）
     private var chatSubtitle: String {
         if isAI { return currentModelName }
