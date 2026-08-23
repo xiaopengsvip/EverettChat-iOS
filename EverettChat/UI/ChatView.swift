@@ -41,6 +41,8 @@ struct ChatView: View {
     @State private var voiceMode = false
     // 表情面板
     @State private var showEmojiPanel = false
+    // 转发目标消息
+    @State private var forwardTarget: ChatMessage? = nil
 
     private var isAI: Bool { appState.chatMode == "ai" }
     private let apiClient = ChatApiClient()
@@ -100,8 +102,10 @@ struct ChatView: View {
                 onPlayVoice: playVoice,
                 onStopVoice: stopVoice,
                 onCopy: { msg in UIPasteboard.general.string = msg.text },
+                onForward: { msg in forwardTarget = msg },
                 onRegenerate: regenerateAIResponse,
                 onDelete: deleteMessage,
+                onResend: resend,
                 onCountChange: { proxy in
                     withAnimation { proxy.scrollTo(messages.last?.id, anchor: .bottom) }
                 },
@@ -280,6 +284,15 @@ struct ChatView: View {
         .fullScreenCover(item: $webURL) { url in
             SafariView(url: url)
         }
+        // 转发：选择目标会话
+        .sheet(item: $forwardTarget) { msg in
+            ForwardSheet(target: msg, appState: appState) { targetId, targetName in
+                appState.transport.sendText(msg.text, target: targetId, messageId: UUID().uuidString)
+                forwardTarget = nil
+                voiceHintText = "已转发给 \(targetName)"
+                showVoiceHint = true
+            }
+        }
         .onAppear {
             messages = isAI ? appState.aiMessages : peerMessagesForCurrent()
         }
@@ -333,8 +346,23 @@ struct ChatView: View {
             sendAI(text)
         } else {
             // 对端加密发送（带 messageId 用于送达确认）
-            appState.transport.sendText(text, target: appState.chatPeerId, messageId: userMsg.id)
+            if appState.transport.isConnected {
+                appState.transport.sendText(text, target: appState.chatPeerId, messageId: userMsg.id)
+            } else {
+                // 未连接 → 标记发送失败，显示重发按钮
+                if let idx = messages.firstIndex(where: { $0.id == userMsg.id }) {
+                    messages[idx].status = "failed"
+                }
+            }
         }
+    }
+
+    /// 重发失败消息
+    private func resend(_ msg: ChatMessage) {
+        if let idx = messages.firstIndex(where: { $0.id == msg.id }) {
+            messages[idx].status = "sent"
+        }
+        appState.transport.sendText(msg.text, target: appState.chatPeerId, messageId: msg.id)
     }
 
     private func sendAI(_ text: String) {
@@ -568,6 +596,8 @@ struct MessageBubble: View {
     let onStopVoice: () -> Void
     @State private var isReasoningExpanded = false
     var avatarState: AvatarState = .idle
+    var autoExpandReasoning: Bool = false
+    var onResend: (() -> Void)? = nil
 
     /// 送达状态图标（自己发的消息：✓ 已发送 / ✓✓ 已送达 / ! 失败）
     @ViewBuilder
@@ -586,6 +616,24 @@ struct MessageBubble: View {
                 .font(.system(size: 10))
                 .foregroundColor(Theme.textTertiary)
         }
+    }
+
+    init(msg: ChatMessage, isMine: Bool, isAI: Bool, deviceName: String,
+         playingVoiceId: String?, onPlayVoice: @escaping (ChatMessage) -> Void,
+         onStopVoice: @escaping () -> Void, avatarState: AvatarState = .idle,
+         autoExpandReasoning: Bool = false, onResend: (() -> Void)? = nil) {
+        self.msg = msg
+        self.isMine = isMine
+        self.isAI = isAI
+        self.deviceName = deviceName
+        self.playingVoiceId = playingVoiceId
+        self.onPlayVoice = onPlayVoice
+        self.onStopVoice = onStopVoice
+        self.avatarState = avatarState
+        self.autoExpandReasoning = autoExpandReasoning
+        self.onResend = onResend
+        // 流式中思考默认展开
+        _isReasoningExpanded = State(initialValue: autoExpandReasoning)
     }
 
     var body: some View {
@@ -614,6 +662,15 @@ struct MessageBubble: View {
                         Text("我 · \(deviceName)")
                             .font(.caption2)
                             .foregroundColor(Theme.textTertiary)
+                        // 发送失败 → 重发按钮
+                        if msg.status == "failed", let onResend {
+                            Button(action: onResend) {
+                                Image(systemName: "arrow.clockwise.circle.fill")
+                                    .font(.system(size: 12))
+                                    .foregroundColor(Theme.error)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 } else {
                     Text(isAI ? "AI 助手" : msg.senderName)
@@ -671,10 +728,13 @@ struct MessageBubble: View {
                                 .foregroundColor(Theme.textPrimary)
                                 .textSelection(.enabled)
                         }
-                        // AI 工具卡片（时间/日历/天气/定位/代码运行）
-                        if isAI, !msg.text.isEmpty {
-                            ForEach(Array(extractToolCards(from: msg.text).enumerated()), id: \.offset) { _, item in
-                                AIToolCardView(card: item.card, code: item.code)
+                        // 工具卡片（时间/日历/天气/定位/代码运行）——所有消息都支持
+                        if !msg.text.isEmpty {
+                            let cards = extractToolCards(from: msg.text)
+                            if !cards.isEmpty {
+                                ForEach(Array(cards.enumerated()), id: \.offset) { _, item in
+                                    AIToolCardView(card: item.card, code: item.code)
+                                }
                             }
                         }
                     }
@@ -1271,8 +1331,10 @@ struct MessageListView: View {
     let onPlayVoice: (ChatMessage) -> Void
     let onStopVoice: () -> Void
     let onCopy: (ChatMessage) -> Void
+    let onForward: (ChatMessage) -> Void
     let onRegenerate: (ChatMessage) -> Void
     let onDelete: (ChatMessage) -> Void
+    let onResend: ((ChatMessage) -> Void)?
     let onCountChange: (ScrollViewProxy) -> Void
     let onStreamChange: (ScrollViewProxy) -> Void
 
@@ -1294,7 +1356,8 @@ struct MessageListView: View {
                             playingVoiceId: playingVoiceId,
                             onPlayVoice: onPlayVoice,
                             onStopVoice: onStopVoice,
-                            avatarState: avatarState
+                            avatarState: avatarState,
+                            onResend: { onResend?(msg) }
                         )
                         .id(msg.id)
                         .contextMenu {
@@ -1302,6 +1365,12 @@ struct MessageListView: View {
                                 onCopy(msg)
                             } label: {
                                 Label("复制", systemImage: "doc.on.doc")
+                            }
+
+                            Button {
+                                onForward(msg)
+                            } label: {
+                                Label("转发", systemImage: "arrowshape.turn.up.right")
                             }
 
                             if isAI && msg.role == "ai" {
@@ -1326,7 +1395,9 @@ struct MessageListView: View {
                             isMine: false, isAI: true, deviceName: deviceName,
                             playingVoiceId: nil,
                             onPlayVoice: { _ in },
-                            onStopVoice: {}
+                            onStopVoice: {},
+                            avatarState: .thinking,
+                            autoExpandReasoning: true
                         )
                         .id("streaming")
                     }
@@ -1371,5 +1442,43 @@ struct ModelSwitcherRow: View {
                 .foregroundColor(Theme.textTertiary)
             Spacer()
         }
+    }
+}
+
+/// 转发选择器：选择目标会话
+struct ForwardSheet: View {
+    let target: ChatMessage
+    let appState: AppState
+    let onForward: (String, String) -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            List {
+                // AI 助手
+                Button {
+                    onForward("", "AI 助手")
+                    dismiss()
+                } label: {
+                    Label("AI 助手", systemImage: "sparkles")
+                        .foregroundColor(Theme.textPrimary)
+                }
+
+                // 最近对端会话
+                let peers = appState.conversations.filter { $0.type == "peer" }
+                ForEach(peers) { conv in
+                    Button {
+                        onForward(conv.id, conv.name)
+                        dismiss()
+                    } label: {
+                        Label(conv.name, systemImage: "person.circle")
+                            .foregroundColor(Theme.textPrimary)
+                    }
+                }
+            }
+            .navigationTitle("转发消息")
+            .navigationBarTitleDisplayMode(.inline)
+        }
+        .presentationDetents([.medium, .large])
     }
 }
