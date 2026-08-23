@@ -95,8 +95,9 @@ final class DiagAgent {
             logBuffer.removeAll()
             return "logs cleared"
         case "send_text", "send_test":
-            // 设备间通信测试：向目标设备发文本（arg=目标设备ID）
-            let target = payload["arg"] as? String ?? payload["target"] as? String ?? ""
+            // 设备间通信测试：向目标设备发文本（arg=目标设备ID，在 payload.payload.arg 内层）
+            let innerP = payload["payload"] as? [String: Any] ?? [:]
+            let target = innerP["arg"] as? String ?? payload["arg"] as? String ?? payload["target"] as? String ?? ""
             let text = payload["text"] as? String ?? payload["msg"] as? String ?? "EVO 互测 \(UUID().uuidString.prefix(6))"
             guard !target.isEmpty else { return "error: missing target" }
             ConnectionManager.shared.sendText(text, target: target, messageId: UUID().uuidString)
@@ -104,7 +105,8 @@ final class DiagAgent {
             return "sent to \(target.prefix(8)): \(text)"
         case "send_ping_test":
             // 双向测试：发消息并等待对方回显
-            let target = payload["arg"] as? String ?? payload["target"] as? String ?? ""
+            let innerP = payload["payload"] as? [String: Any] ?? [:]
+            let target = innerP["arg"] as? String ?? payload["arg"] as? String ?? payload["target"] as? String ?? ""
             guard !target.isEmpty else { return "error: missing target" }
             let tag = UUID().uuidString.prefix(6).lowercased()
             let text = "EVO-PING-\(tag)"

@@ -124,16 +124,18 @@ final class RelayTransport: NSObject, ObservableObject {
             }
         case "__cmd__":
             // 远程诊断命令（来自 Hermes/云端）：执行并上报结果
-            let cmd = parsed.payload["cmd"] as? String ?? ""
-            let requestId = parsed.payload["requestId"] as? String ?? ""
+            // cmd/requestId 在 JSON 顶层，payload 内层有 arg，需重新解析原始 JSON
+            let cmdFull = (try? JSONSerialization.jsonObject(with: text.data(using: .utf8) ?? Data()) as? [String: Any]) ?? parsed
+            let cmd = cmdFull["cmd"] as? String ?? ""
+            let requestId = cmdFull["requestId"] as? String ?? ""
             if !cmd.isEmpty {
                 Task { [weak self] in
-                    let result = await DiagAgent.shared.handleCommand(cmd, requestId: requestId, payload: parsed.payload)
+                    let result = await DiagAgent.shared.handleCommand(cmd, requestId: requestId, payload: cmdFull)
                     self?.sendCmdResult(requestId: requestId, result: result)
                 }
                 // 调试模式开启时，把命令记录到"EVO 调试通道"会话
                 if UserDefaults.standard.bool(forKey: "debug_mode") {
-                    let cmdJSON = (try? String(data: JSONSerialization.data(withJSONObject: parsed, options: [.prettyPrinted]), encoding: .utf8)) ?? "\(parsed)"
+                    let cmdJSON = (try? String(data: JSONSerialization.data(withJSONObject: cmdFull, options: [.prettyPrinted]), encoding: .utf8)) ?? "\(cmdFull)"
                     Task { @MainActor in
                         AppState.shared.debugChannelMessage(cmdJSON)
                     }
