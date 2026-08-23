@@ -33,7 +33,7 @@ struct ContactsView: View {
             ScrollView {
                 // 在线用户
                 Text("在线用户").font(.caption).foregroundColor(Theme.textTertiary).padding(.leading, Spacing.lg)
-                ForEach(appState.transport.onlineUsers.filter {
+                ForEach(appState.conn.onlineUsers.filter {
                     searchQuery.isEmpty || $0.name.contains(searchQuery)
                 }) { user in
                     UserRow(user: user, isFriend: appState.contacts.contains { $0.deviceId == user.deviceId })

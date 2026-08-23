@@ -150,7 +150,7 @@ final class RelayTransport: NSObject, ObservableObject {
 
     // MARK: - 发送
 
-    private func sendRaw(type: String, target: String = "", payload: [String: Any] = [:]) {
+    func sendRaw(type: String, target: String = "", payload: [String: Any] = [:]) {
         var msg: [String: Any] = [
             "type": type,
             "id": UUID().uuidString,

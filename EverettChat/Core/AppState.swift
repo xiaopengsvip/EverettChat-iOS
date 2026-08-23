@@ -18,11 +18,8 @@ final class AppState: ObservableObject {
     let deviceId = DeviceIdentity.shared.deviceId
     var deviceName: String { DeviceIdentity.shared.deviceName }
 
-    // 传输层
-    let transport = RelayTransport(
-        deviceId: DeviceIdentity.shared.deviceId,
-        deviceName: DeviceIdentity.shared.deviceName
-    )
+    // 传输层（统一 ConnectionManager：LAN → P2P → Cloud）
+    let conn = ConnectionManager.shared
 
     // 会话与消息
     @Published var conversations: [Conversation] = [] {
@@ -56,7 +53,7 @@ final class AppState: ObservableObject {
     func start() {
         // 启动自动应用 TTL 清理
         applyAutoDelete()
-        transport.onMessage = { [weak self] type, from, senderId, payload in
+        conn.onMessage = { [weak self] type, from, senderId, payload in
             guard let self else { return }
             switch type {
             case "friend-request":
@@ -113,12 +110,12 @@ final class AppState: ObservableObject {
             }
         }
         // 启动自动连接中继
-        transport.connect()
+        conn.connect()
         // 监听在线用户
         Task {
             while true {
                 try? await Task.sleep(nanoseconds: 30_000_000_000)
-                transport.requestOnlineUsers()
+                conn.requestOnlineUsers()
             }
         }
     }

@@ -157,7 +157,7 @@ struct ChatView: View {
                             } else {
                                 let msg = ChatMessage(role: "user", text: card, senderId: appState.chatPeerId)
                                 messages.append(msg)
-                                appState.transport.sendText(card, target: appState.chatPeerId, messageId: msg.id)
+                                appState.conn.sendText(card, target: appState.chatPeerId, messageId: msg.id)
                             }
                             showPlusPanel = false
                         }
@@ -270,7 +270,7 @@ struct ChatView: View {
                     } else {
                         let msg = ChatMessage(role: "user", text: "", imageBase64: b64, senderName: DeviceIdentity.shared.deviceName)
                         messages.append(msg)
-                        appState.transport.sendImage(base64: b64, target: appState.chatPeerId, messageId: msg.id)
+                        appState.conn.sendImage(base64: b64, target: appState.chatPeerId, messageId: msg.id)
                     }
                 }
                 pickerItem = nil
@@ -287,7 +287,7 @@ struct ChatView: View {
         // 转发：选择目标会话
         .sheet(item: $forwardTarget) { msg in
             ForwardSheet(target: msg, appState: appState) { targetId, targetName in
-                appState.transport.sendText(msg.text, target: targetId, messageId: UUID().uuidString)
+                appState.conn.sendText(msg.text, target: targetId, messageId: UUID().uuidString)
                 forwardTarget = nil
                 voiceHintText = "已转发给 \(targetName)"
                 showVoiceHint = true
@@ -346,8 +346,8 @@ struct ChatView: View {
             sendAI(text)
         } else {
             // 对端加密发送（带 messageId 用于送达确认）
-            if appState.transport.isConnected {
-                appState.transport.sendText(text, target: appState.chatPeerId, messageId: userMsg.id)
+            if appState.conn.isConnected {
+                appState.conn.sendText(text, target: appState.chatPeerId, messageId: userMsg.id)
             } else {
                 // 未连接 → 标记发送失败，显示重发按钮
                 if let idx = messages.firstIndex(where: { $0.id == userMsg.id }) {
@@ -362,7 +362,7 @@ struct ChatView: View {
         if let idx = messages.firstIndex(where: { $0.id == msg.id }) {
             messages[idx].status = "sent"
         }
-        appState.transport.sendText(msg.text, target: appState.chatPeerId, messageId: msg.id)
+        appState.conn.sendText(msg.text, target: appState.chatPeerId, messageId: msg.id)
     }
 
     private func sendAI(_ text: String) {
@@ -504,7 +504,7 @@ struct ChatView: View {
         let b64 = data.base64EncodedString()
         let msg = ChatMessage(role: "user", text: "", voiceBase64: b64, voiceDurationMs: duration * 1000, senderName: DeviceIdentity.shared.deviceName)
         messages.append(msg)
-        appState.transport.sendVoice(base64: b64, target: appState.chatPeerId, durationMs: duration * 1000, messageId: msg.id)
+        appState.conn.sendVoice(base64: b64, target: appState.chatPeerId, durationMs: duration * 1000, messageId: msg.id)
         try? FileManager.default.removeItem(at: url)
     }
 
@@ -554,7 +554,7 @@ struct ChatView: View {
             let msg = ChatMessage(role: "user", text: text, senderName: DeviceIdentity.shared.deviceName)
             messages.append(msg)
             // 文件走图片通道？（relay 无 file 类型）——用文本通道发文件名 + data 标记
-            appState.transport.sendText("[file]\(name)::\(b64)", target: appState.chatPeerId, messageId: msg.id)
+            appState.conn.sendText("[file]\(name)::\(b64)", target: appState.chatPeerId, messageId: msg.id)
         }
     }
 
@@ -570,7 +570,7 @@ struct ChatView: View {
         } else {
             let msg = ChatMessage(role: "user", text: "", imageBase64: b64, senderName: DeviceIdentity.shared.deviceName)
             messages.append(msg)
-            appState.transport.sendImage(base64: b64, target: appState.chatPeerId, messageId: msg.id)
+            appState.conn.sendImage(base64: b64, target: appState.chatPeerId, messageId: msg.id)
         }
     }
 
