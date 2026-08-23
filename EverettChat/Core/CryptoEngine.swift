@@ -175,10 +175,11 @@ enum CryptoEngine {
     }
 
     /// X25519 共享秘密（32B raw）
-    static func x25519SharedSecret(myPriv: Curve25519.KeyAgreement.PrivateKey,
-                                   peerPub: Curve25519.KeyAgreement.PublicKey) -> Data? {
-        return try? myPriv.sharedSecretFromKeyAgreement(with: peerPub)
-    }
+        static func x25519SharedSecret(myPriv: Curve25519.KeyAgreement.PrivateKey,
+                                       peerPub: Curve25519.KeyAgreement.PublicKey) -> Data? {
+            return try? myPriv.sharedSecretFromKeyAgreement(with: peerPub)
+                .withUnsafeBytes { Data($0) }
+        }
 
     /// 编码 X25519 公钥为 Base64（raw 32B）
     static func x25519PubToB64(_ pub: Curve25519.KeyAgreement.PublicKey) -> String {
