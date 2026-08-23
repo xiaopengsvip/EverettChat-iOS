@@ -19,6 +19,9 @@ struct PageTitleBar: View {
                 Spacer()
                 if let trailing {
                     trailing
+                } else {
+                    // 占位：无按钮时也保持标题栏高度一致（与有按钮页相同）
+                    Color.clear.frame(width: 32, height: 32)
                 }
             }
         }

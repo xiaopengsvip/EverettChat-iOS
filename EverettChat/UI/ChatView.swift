@@ -1057,6 +1057,10 @@ struct AttachmentItem: View {
                 Text(label)
                     .font(.caption)
                     .foregroundColor(Theme.textSecondary)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                    .frame(maxWidth: 72)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
         .buttonStyle(.plain)
