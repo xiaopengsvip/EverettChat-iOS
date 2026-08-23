@@ -19,7 +19,7 @@ struct GlassSearchBar: View {
                 } label: {
                     Image(systemName: "xmark.circle.fill")
                         .font(.system(size: 13))
-                        .foregroundColor(.tertiaryLabel)
+                        .foregroundColor(.tertiary)
                 }
             }
         }
