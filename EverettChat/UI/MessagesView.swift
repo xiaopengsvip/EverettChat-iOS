@@ -58,7 +58,8 @@ struct MessagesView: View {
                                 name: conv.name,
                                 subtitle: conv.lastText,
                                 time: Self.formatTime(conv.lastTime),
-                                unread: conv.unread
+                                unread: conv.unread,
+                                avatarImage: ProfileStore.shared.friendAvatar(conv.id)
                             ) {
                                 appState.openPeerChat(name: conv.name, peerId: conv.id)
                             }
@@ -86,17 +87,26 @@ struct ConversationRow: View {
     let time: String
     var unread: Int = 0
     var accent: Bool = false
+    var avatarImage: UIImage? = nil
     let action: () -> Void
 
     var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.md) {
-                // 头像
+                // 头像（优先图片，其次 emoji/占位）
                 ZStack {
                     Circle()
                         .fill(accent ? Theme.primaryDim : Theme.surfaceAlt)
-                    Text(icon)
-                        .font(.system(size: 22))
+                    if let avatarImage {
+                        Image(uiImage: avatarImage)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 48, height: 48)
+                            .clipShape(Circle())
+                    } else {
+                        Text(icon)
+                            .font(.system(size: 22))
+                    }
                 }
                 .frame(width: 48, height: 48)
 

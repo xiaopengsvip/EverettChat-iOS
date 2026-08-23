@@ -4,6 +4,7 @@ import UIKit
 /// 我的页（设置）
 struct SettingsView: View {
     @EnvironmentObject var appState: AppState
+    @ObservedObject private var profile = ProfileStore.shared
     @State private var showAutoDelete = false
     @State private var showRecoveryKey = false
     @State private var showRestore = false
@@ -13,6 +14,7 @@ struct SettingsView: View {
     @State private var webURL: URL?
     @State private var showSessionPicker = false
     @State private var showStorageManager = false
+    @State private var showProfileEdit = false
 
     var body: some View {
         VStack(spacing: 0) {
@@ -21,28 +23,50 @@ struct SettingsView: View {
 
             ScrollView {
                 VStack(alignment: .leading, spacing: 0) {
-                    // 用户卡片（点击二维码可查看）
-                    HStack(spacing: Spacing.md) {
-                        Circle().fill(Theme.surfaceAlt).frame(width: 52, height: 52).overlay(Text("👤").font(.title3))
-                        VStack(alignment: .leading) {
-                            Text(appState.deviceName).font(.body.weight(.semibold)).foregroundColor(Theme.textPrimary)
-                            Text("唯一 ID: \(String(appState.deviceId.prefix(8)))")
-                                .font(.caption.monospaced()).foregroundColor(Theme.textTertiary)
+                    // 用户卡片（头像 + 名称 + 签名，点击进资料页）
+                    Button {
+                        showProfileEdit = true
+                    } label: {
+                        HStack(spacing: Spacing.md) {
+                            // 头像（与聊天/会话列表打通）
+                            if let img = ProfileStore.shared.myAvatarImage {
+                                Image(uiImage: img)
+                                    .resizable()
+                                    .scaledToFill()
+                                    .frame(width: 56, height: 56)
+                                    .clipShape(Circle())
+                                    .overlay(Circle().stroke(Theme.outline, lineWidth: 1))
+                            } else {
+                                LivingAvatarBubble(state: .idle, size: 56)
+                                    .frame(width: 56, height: 56)
+                            }
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(ProfileStore.shared.myProfile.name.isEmpty ? appState.deviceName : ProfileStore.shared.myProfile.name)
+                                    .font(.body.weight(.semibold))
+                                    .foregroundColor(Theme.textPrimary)
+                                Text(ProfileStore.shared.myProfile.signature.isEmpty ? "这个人很懒，什么都没写~" : ProfileStore.shared.myProfile.signature)
+                                    .font(.caption)
+                                    .foregroundColor(Theme.textTertiary)
+                                    .lineLimit(1)
+                                Text("唯一 ID: \(String(appState.deviceId.prefix(8)))")
+                                    .font(.caption2.monospaced())
+                                    .foregroundColor(Theme.textTertiary)
+                            }
+                            Spacer()
+                            Image(systemName: "chevron.right")
+                                .font(.caption)
+                                .foregroundColor(Theme.textTertiary)
                         }
-                        Spacer()
-                        // 二维码按钮：点击查看我的二维码
-                        Button {
-                            showMyQr = true
-                        } label: {
-                            Image(systemName: "qrcode")
-                                .font(.system(size: 20))
-                                .foregroundColor(Theme.primary)
-                                .frame(width: 40, height: 40)
-                                .background(RoundedRectangle(cornerRadius: 10).fill(Theme.primaryDim))
-                        }
+                        .padding(Spacing.lg)
+                        .background(
+                            RoundedRectangle(cornerRadius: Radius.medium)
+                                .fill(Theme.surface)
+                                .overlay(RoundedRectangle(cornerRadius: Radius.medium).stroke(Theme.outline, lineWidth: 1))
+                        )
+                        .contentShape(Rectangle())
                     }
-                    .padding(Spacing.lg)
-                    .contentShape(Rectangle())
+                    .buttonStyle(.plain)
+                    .padding(.horizontal, Spacing.lg)
 
                     sectionHeader("外观")
                     VStack(spacing: 0) {
@@ -136,6 +160,10 @@ struct SettingsView: View {
         // 存储管理
         .sheet(isPresented: $showStorageManager) {
             StorageManagerView()
+        }
+        // 个人资料编辑
+        .sheet(isPresented: $showProfileEdit) {
+            ProfileEditView()
         }
         // 恢复密钥展示
         .alert("恢复密钥", isPresented: $showRecoveryKey) {

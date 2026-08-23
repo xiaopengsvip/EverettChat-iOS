@@ -683,6 +683,9 @@ struct MessageBubble: View {
     var onResend: (() -> Void)? = nil
     var onImageTap: ((UIImage) -> Void)? = nil
     var onVideoTap: ((String) -> Void)? = nil
+    var onCopy: (() -> Void)? = nil
+    var onForward: (() -> Void)? = nil
+    var onDelete: (() -> Void)? = nil
 
     /// 送达状态图标（自己发的消息：✓ 已发送 / ✓✓ 已送达 / ! 失败）
     @ViewBuilder
@@ -721,7 +724,8 @@ struct MessageBubble: View {
          playingVoiceId: String?, onPlayVoice: @escaping (ChatMessage) -> Void,
          onStopVoice: @escaping () -> Void, avatarState: AvatarState = .idle,
          autoExpandReasoning: Bool = false, onResend: (() -> Void)? = nil,
-         onImageTap: ((UIImage) -> Void)? = nil, onVideoTap: ((String) -> Void)? = nil) {
+         onImageTap: ((UIImage) -> Void)? = nil, onVideoTap: ((String) -> Void)? = nil,
+         onCopy: (() -> Void)? = nil, onForward: (() -> Void)? = nil, onDelete: (() -> Void)? = nil) {
         self.msg = msg
         self.isMine = isMine
         self.isAI = isAI
@@ -734,6 +738,9 @@ struct MessageBubble: View {
         self.onResend = onResend
         self.onImageTap = onImageTap
         self.onVideoTap = onVideoTap
+        self.onCopy = onCopy
+        self.onForward = onForward
+        self.onDelete = onDelete
         // 流式中思考默认展开
         _isReasoningExpanded = State(initialValue: autoExpandReasoning)
     }
@@ -742,14 +749,23 @@ struct MessageBubble: View {
         HStack(alignment: .top, spacing: 8) {
             // 左头像列（对方）
             if !isMine {
-                // AI：Evo Living Avatar（按状态动画）；对端：占位头像
+                // AI：Evo Living Avatar（按状态动画）；对端：好友头像或占位
                 if isAI {
                     LivingAvatarBubble(state: avatarState, size: 36)
                 } else {
-                    Circle()
-                        .fill(Theme.surfaceAlt)
-                        .frame(width: 36, height: 36)
-                        .overlay(Text("👤").font(.system(size: 18)))
+                    if let peerAvatar = ProfileStore.shared.friendAvatar(msg.senderId.isEmpty ? msg.senderName : msg.senderId) {
+                        Image(uiImage: peerAvatar)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 36, height: 36)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Theme.outline, lineWidth: 1))
+                    } else {
+                        Circle()
+                            .fill(Theme.surfaceAlt)
+                            .frame(width: 36, height: 36)
+                            .overlay(Text("👤").font(.system(size: 18)))
+                    }
                 }
             } else {
                 Color.clear.frame(width: 44, height: 44)
@@ -773,11 +789,51 @@ struct MessageBubble: View {
                             }
                             .buttonStyle(.plain)
                         }
+                        // 操作菜单（复制/转发/删除——可见按钮）
+                        if let onCopy, let onForward, let onDelete {
+                            Menu {
+                                Button(action: onCopy) {
+                                    Label("复制", systemImage: "doc.on.doc")
+                                }
+                                Button(action: onForward) {
+                                    Label("转发", systemImage: "arrowshape.turn.up.right")
+                                }
+                                Button(role: .destructive, action: onDelete) {
+                                    Label("删除", systemImage: "trash")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(Theme.textTertiary)
+                                    .padding(4)
+                            }
+                        }
                     }
                 } else {
-                    Text(isAI ? "AI 助手" : msg.senderName)
-                        .font(.caption2)
-                        .foregroundColor(isAI ? Theme.info : Theme.textTertiary)
+                    HStack(spacing: 4) {
+                        Text(isAI ? "AI 助手" : msg.senderName)
+                            .font(.caption2)
+                            .foregroundColor(isAI ? Theme.info : Theme.textTertiary)
+                        // 操作菜单（复制/转发/删除——可见按钮）
+                        if let onCopy, let onForward, let onDelete {
+                            Menu {
+                                Button(action: onCopy) {
+                                    Label("复制", systemImage: "doc.on.doc")
+                                }
+                                Button(action: onForward) {
+                                    Label("转发", systemImage: "arrowshape.turn.up.right")
+                                }
+                                Button(role: .destructive, action: onDelete) {
+                                    Label("删除", systemImage: "trash")
+                                }
+                            } label: {
+                                Image(systemName: "ellipsis")
+                                    .font(.system(size: 11, weight: .semibold))
+                                    .foregroundColor(Theme.textTertiary)
+                                    .padding(4)
+                            }
+                        }
+                    }
                 }
 
                 // 气泡内容
@@ -1497,7 +1553,10 @@ struct MessageListView: View {
                             avatarState: avatarState,
                             onResend: { onResend?(msg) },
                             onImageTap: onImageTap,
-                            onVideoTap: onVideoTap
+                            onVideoTap: onVideoTap,
+                            onCopy: { onCopy(msg) },
+                            onForward: { onForward(msg) },
+                            onDelete: { onDelete(msg) }
                         )
                         .id(msg.id)
                         .contextMenu {
