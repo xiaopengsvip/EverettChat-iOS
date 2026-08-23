@@ -86,8 +86,8 @@ struct MessagesView: View {
                             subtitle: conv.lastText,
                             time: Self.formatTime(conv.lastTime),
                             unread: conv.unread,
-                            isOnline: appState.onlineDeviceIds.contains(conv.id),
-                            avatarImage: ProfileStore.shared.friendAvatar(conv.id)
+                                                        avatarImage: ProfileStore.shared.friendAvatar(conv.id),
+                                                        isOnline: appState.onlineDeviceIds.contains(conv.id),
                         ) {
                             appState.openPeerChat(name: conv.name, peerId: conv.id)
                         }
