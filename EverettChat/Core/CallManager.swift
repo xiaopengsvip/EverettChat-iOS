@@ -94,6 +94,8 @@ final class CallManager: ObservableObject {
             "callType": type == .video ? "video" : "audio",
             "target": peerId
         ])
+        // 启动 WebRTC 引擎（发起 Offer）
+        WebRTCEngine.shared.startCall(type: type)
         // 超时挂断（60s 未接听）
         DispatchQueue.main.asyncAfter(deadline: .now() + 60) { [weak self] in
             if self?.state == .outgoing {
@@ -107,6 +109,8 @@ final class CallManager: ObservableObject {
         guard state == .ringing else { return }
         state = .connecting
         conn.send(type: "call-accept", target: peerId, payload: ["target": peerId])
+        // 启动 WebRTC 引擎（应答 Offer）
+        WebRTCEngine.shared.acceptCall(type: callType)
         startTimer()
     }
 
@@ -122,6 +126,8 @@ final class CallManager: ObservableObject {
         if state != .idle && state != .ended {
             conn.send(type: "call-end", target: peerId, payload: ["target": peerId])
         }
+        // 关闭 WebRTC 引擎
+        WebRTCEngine.shared.endCall()
         state = .ended
         stopTimer()
         // 延迟复位到空闲（UI 显示"通话结束"后回到空闲）
