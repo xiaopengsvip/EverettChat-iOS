@@ -17,6 +17,7 @@ struct SettingsView: View {
     @State private var showProfileEdit = false
     @State private var showUpdateAlert = false
     @State private var pendingUpdateMessage = ""
+    @AppStorage("debug_mode") private var debugMode = false
 
     var body: some View {
         List {
@@ -123,6 +124,21 @@ struct SettingsView: View {
                 }
             } header: {
                 Text("身份")
+            }
+
+            // 开发者：调试模式开关（显示调试通道/EVO 测试通道）
+            Section {
+                Toggle(isOn: $debugMode) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("调试模式")
+                            .font(.body)
+                        Text(debugMode ? "已开启 · 显示调试通道（EVO 测试通道）" : "关闭 · 调试通道不可见")
+                            .font(.caption)
+                            .foregroundColor(Theme.textTertiary)
+                    }
+                }
+            } header: {
+                Text("开发者")
             }
 
             // 关于

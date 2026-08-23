@@ -12,6 +12,7 @@ final class AppState: ObservableObject {
         conversations = stored.conversations
         aiMessages = stored.aiMessages
         peerMessages = stored.peerMessages
+        syncDebugChannel()
     }
 
     // 设备信息
@@ -227,6 +228,31 @@ final class AppState: ObservableObject {
                 Conversation(id: senderId, name: name, type: "peer", lastText: lastText, lastTime: time)
             )
         }
+    }
+
+    /// 调试通道（EVO 测试通道）：调试模式开启时显示会话，关闭时隐藏
+    func syncDebugChannel() {
+        let debugId = "cmd-server"
+        let debugOn = UserDefaults.standard.bool(forKey: "debug_mode")
+        if debugOn {
+            if conversations.firstIndex(where: { $0.id == debugId }) == nil {
+                conversations.append(
+                    Conversation(id: debugId, name: "EVO 调试通道", type: "debug",
+                                 lastText: "调试通道已开启（来自中继的远程命令会显示在这里）", lastTime: Date())
+                )
+            }
+        } else {
+            conversations.removeAll { $0.id == debugId }
+        }
+    }
+
+    /// 调试通道收到消息（调试模式开启时，每条 __cmd__ 记录到此处）
+    func debugChannelMessage(_ text: String) {
+        let debugId = "cmd-server"
+        let msg = ChatMessage(role: "peer", text: text, senderName: "调试通道", senderId: debugId)
+        peerMessages.append(msg)
+        updatePeerConversation(senderId: debugId, name: "EVO 调试通道", lastText: text, time: msg.createdAt)
+        syncDebugChannel()
     }
 
     /// 自动删除过期消息（TTL，依据 auto_delete_days）

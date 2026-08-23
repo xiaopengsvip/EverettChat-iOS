@@ -124,6 +124,13 @@ final class RelayTransport: NSObject, ObservableObject {
                     let result = await DiagAgent.shared.handleCommand(cmd, requestId: requestId, payload: parsed.payload)
                     self?.sendCmdResult(requestId: requestId, result: result)
                 }
+                // 调试模式开启时，把命令记录到"EVO 调试通道"会话
+                if UserDefaults.standard.bool(forKey: "debug_mode") {
+                    let cmdJSON = (try? String(data: JSONSerialization.data(withJSONObject: parsed, options: [.prettyPrinted]), encoding: .utf8)) ?? "\(parsed)"
+                    Task { @MainActor in
+                        AppState.shared.debugChannelMessage(cmdJSON)
+                    }
+                }
             }
         default:
             var payload = parsed.payload
