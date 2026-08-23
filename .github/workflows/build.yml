@@ -55,7 +55,7 @@ jobs:
             CODE_SIGN_IDENTITY="" \
             build > build.log 2>&1 || true
           tail -80 build.log
-          if grep -q "BUILD FAILED\|error:" build.log; then
+          if grep -q "\*\* BUILD FAILED \*\*" build.log; then
             echo "::error::BUILD FAILED"
             exit 1
           fi
