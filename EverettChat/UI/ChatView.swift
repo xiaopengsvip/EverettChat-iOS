@@ -140,15 +140,15 @@ struct ChatView: View {
             ForwardSheet(target: msg, appState: appState) { forwardedMsg, targetId, targetName in
                 // 按消息类型转发
                 let destId = targetId.isEmpty ? forwardedMsg.senderId : targetId
-                if forwardedMsg.imageBase64.isNotEmpty {
-                    appState.conn.sendImage(base64: forwardedMsg.imageBase64, target: destId,
-                                            name: "forward_image.jpg", mime: "image/jpeg", text: forwardedMsg.text,
-                                            messageId: UUID().uuidString)
-                } else if forwardedMsg.voiceBase64.isNotEmpty {
-                    appState.conn.sendVoice(base64: forwardedMsg.voiceBase64, target: destId,
-                                            durationMs: forwardedMsg.voiceDurationMs,
-                                            messageId: UUID().uuidString)
-                } else if forwardedMsg.videoBase64.isNotEmpty {
+                if !forwardedMsg.imageBase64.isEmpty {
+                                    appState.conn.sendImage(base64: forwardedMsg.imageBase64, target: destId,
+                                                            name: "forward_image.jpg", mime: "image/jpeg", text: forwardedMsg.text,
+                                                            messageId: UUID().uuidString)
+                                } else if !forwardedMsg.voiceBase64.isEmpty {
+                                    appState.conn.sendVoice(base64: forwardedMsg.voiceBase64, target: destId,
+                                                            durationMs: forwardedMsg.voiceDurationMs,
+                                                            messageId: UUID().uuidString)
+                                } else if !forwardedMsg.videoBase64.isEmpty {
                     appState.conn.sendVideo(base64: forwardedMsg.videoBase64, target: destId,
                                             durationMs: forwardedMsg.videoDurationMs,
                                             messageId: UUID().uuidString)
