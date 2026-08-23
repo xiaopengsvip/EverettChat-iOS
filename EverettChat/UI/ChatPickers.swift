@@ -1,6 +1,7 @@
 import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
+import AVFoundation
 
 /// 文件选择器（UIDocumentPicker 封装）
 struct DocumentPicker: UIViewControllerRepresentable {
@@ -30,15 +31,30 @@ struct DocumentPicker: UIViewControllerRepresentable {
     }
 }
 
-/// 相机拍摄（UIImagePickerController 封装）
+/// 相机拍摄：拍照 / 录像（系统中文界面自动适配系统语言）
 struct CameraPicker: UIViewControllerRepresentable {
+    var mode: CameraMode = .photo
     var onCapture: (UIImage) -> Void
+    var onVideo: ((URL) -> Void)?
     @Environment(\.dismiss) private var dismiss
+
+    enum CameraMode {
+        case photo
+        case video
+    }
 
     func makeUIViewController(context: Context) -> UIImagePickerController {
         let picker = UIImagePickerController()
         picker.sourceType = .camera
         picker.delegate = context.coordinator
+        if mode == .video {
+            picker.mediaTypes = [UTType.movie.identifier]
+            picker.videoQuality = .typeMedium
+            picker.cameraCaptureMode = .video
+        } else {
+            picker.mediaTypes = [UTType.image.identifier]
+            picker.cameraCaptureMode = .photo
+        }
         return picker
     }
 
@@ -51,8 +67,14 @@ struct CameraPicker: UIViewControllerRepresentable {
         init(_ parent: CameraPicker) { self.parent = parent }
 
         func imagePickerController(_ picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [UIImagePickerController.InfoKey: Any]) {
-            if let image = info[.originalImage] as? UIImage {
-                parent.onCapture(image)
+            if parent.mode == .video {
+                if let videoURL = info[.mediaURL] as? URL {
+                    parent.onVideo?(videoURL)
+                }
+            } else {
+                if let image = info[.originalImage] as? UIImage {
+                    parent.onCapture(image)
+                }
             }
             parent.dismiss()
         }

@@ -130,6 +130,10 @@ final class ConnectionManager: ObservableObject {
         cloud.sendVoice(base64: base64, target: target, durationMs: durationMs, mime: mime, messageId: messageId)
     }
 
+    func sendVideo(base64: String, target: String, durationMs: Double, mime: String = "video/mp4", messageId: String = "") {
+        cloud.sendVideo(base64: base64, target: target, durationMs: durationMs, mime: mime, messageId: messageId)
+    }
+
     func sendAck(messageId: String, target: String) {
         cloud.sendAck(messageId: messageId, target: target)
     }

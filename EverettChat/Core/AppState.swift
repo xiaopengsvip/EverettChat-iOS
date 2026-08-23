@@ -111,6 +111,24 @@ final class AppState: ObservableObject {
                     lastText: "[语音]",
                     time: message.createdAt
                 )
+            case "video":
+                guard let videoBase64 = payload["data"] as? String else { return }
+                let durationMs = payload["durationMs"] as? Double ?? 0
+                let message = ChatMessage(
+                    role: "peer",
+                    text: "",
+                    videoBase64: videoBase64,
+                    videoDurationMs: durationMs,
+                    senderName: from,
+                    senderId: senderId
+                )
+                self.peerMessages.append(message)
+                self.updatePeerConversation(
+                    senderId: senderId,
+                    name: from,
+                    lastText: "[视频]",
+                    time: message.createdAt
+                )
             case "ack":
                 guard let ackId = payload["ackId"] as? String else { return }
                 if let idx = self.peerMessages.firstIndex(where: { $0.id == ackId }) {

@@ -198,6 +198,14 @@ final class RelayTransport: NSObject, ObservableObject {
         sendRaw(type: "ack", target: target, payload: ["ackId": messageId, "target": target])
     }
 
+    /// 发送视频消息
+    func sendVideo(base64: String, target: String, durationMs: Double, mime: String = "video/mp4", messageId: String = "") {
+        guard let enc = CryptoEngine.encrypt(base64, passphrase: passphrase) else { return }
+        var payload: [String: Any] = ["data": enc, "mime": mime, "durationMs": durationMs, "target": target]
+        if !messageId.isEmpty { payload["messageId"] = messageId }
+        sendRaw(type: "video", target: target, payload: payload)
+    }
+
     /// 查询在线用户
     func requestOnlineUsers() {
         sendRaw(type: "get-users")

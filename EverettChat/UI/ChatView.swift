@@ -2,6 +2,7 @@ import SwiftUI
 import UIKit
 import PhotosUI
 import AVFoundation
+import UniformTypeIdentifiers
 
 /// 聊天页（AI / 对端，Document Style + 思考折叠 + 模型选择）
 struct ChatView: View {
@@ -32,6 +33,8 @@ struct ChatView: View {
     @State private var showFilePicker = false
     // 拍摄
     @State private var showCamera = false
+    @State private var showCameraModePicker = false
+    @State private var cameraMode: CameraPicker.CameraMode = .photo
     @State private var cameraImage: UIImage?
     // 语音按住录音：上滑取消
     @State private var isVoiceSlidingUp = false
@@ -43,6 +46,9 @@ struct ChatView: View {
     @State private var showEmojiPanel = false
     // 转发目标消息
     @State private var forwardTarget: ChatMessage? = nil
+    // 图片全屏预览 / 视频播放
+    @State private var fullscreenImage: UIImage? = nil
+    @State private var videoToPlay: String? = nil
 
     private var isAI: Bool { appState.chatMode == "ai" }
     private let apiClient = ChatApiClient()
@@ -106,6 +112,8 @@ struct ChatView: View {
                 onRegenerate: regenerateAIResponse,
                 onDelete: deleteMessage,
                 onResend: resend,
+                onImageTap: { img in fullscreenImage = img },
+                onVideoTap: { b64 in videoToPlay = b64 },
                 onCountChange: { proxy in
                     withAnimation { proxy.scrollTo(messages.last?.id, anchor: .bottom) }
                 },
@@ -130,7 +138,7 @@ struct ChatView: View {
                 if showPlusPanel {
                     AttachmentPanel(
                         onAlbum: { showPhotoPicker = true },
-                        onCamera: { showCamera = true },
+                        onCamera: { showCameraModePicker = true },
                         onFile: { showFilePicker = true },
                         onVoiceCall: {
                             showPlusPanel = false
@@ -256,28 +264,39 @@ struct ChatView: View {
         }
         // 相机拍摄
         .fullScreenCover(isPresented: $showCamera) {
-            CameraPicker { image in
-                sendCameraImage(image)
-            }
+            CameraPicker(mode: cameraMode,
+                         onCapture: { image in sendCameraImage(image) },
+                         onVideo: { url in sendCameraVideo(url) })
         }
-        // 相册（PhotosPicker 展示）
-        .photosPicker(isPresented: $showPhotoPicker, selection: $pickerItem, matching: .images)
+        // 相机模式选择（拍照/录像）
+        .confirmationDialog("拍摄", isPresented: $showCameraModePicker, titleVisibility: .visible) {
+            Button("📷 拍照") {
+                cameraMode = .photo
+                showCamera = true
+            }
+            Button("🎥 录像") {
+                cameraMode = .video
+                showCamera = true
+            }
+            Button("取消", role: .cancel) {}
+        }
+        // 相册（图片 + 视频）
+        .photosPicker(isPresented: $showPhotoPicker, selection: $pickerItem, matching: .any(of: [.images, .videos]))
         .onChange(of: pickerItem) { item in
             guard let item else { return }
             Task {
-                if let data = try? await item.loadTransferable(type: Data.self),
-                   let img = UIImage(data: data) {
-                    let resized = img.resized(maxSide: 1280)
-                    let jpeg = resized.jpegData(compressionQuality: 0.8) ?? data
-                    let b64 = jpeg.base64EncodedString()
-                    if isAI {
-                        let msg = ChatMessage(role: "user", text: "", imageBase64: b64)
-                        messages.append(msg)
-                        sendAI(text: "", imageBase64: b64)
+                if let data = try? await item.loadTransferable(type: Data.self) {
+                    // 判断是图片还是视频
+                    if let type = item.supportedContentTypes.first {
+                        if type.conforms(to: .movie) || type.conforms(to: .video) {
+                            sendVideoData(data)
+                        } else if type.conforms(to: .image) {
+                            sendImageData(data)
+                        } else {
+                            sendFile(name: "媒体_\(Date().timeIntervalSince1970)", data: data)
+                        }
                     } else {
-                        let msg = ChatMessage(role: "user", text: "", imageBase64: b64, senderName: DeviceIdentity.shared.deviceName)
-                        messages.append(msg)
-                        appState.conn.sendImage(base64: b64, target: appState.chatPeerId, messageId: msg.id)
+                        sendImageData(data)
                     }
                 }
                 pickerItem = nil
@@ -299,6 +318,14 @@ struct ChatView: View {
                 voiceHintText = "已转发给 \(targetName)"
                 showVoiceHint = true
             }
+        }
+        // 图片全屏预览
+        .fullScreenCover(item: $fullscreenImage) { img in
+            FullscreenImageView(image: img)
+        }
+        // 视频全屏播放（应用内 AVPlayer）
+        .fullScreenCover(item: $videoToPlay) { b64 in
+            FullscreenVideoView(videoBase64: b64)
         }
         .onAppear {
             messages = isAI ? appState.aiMessages : peerMessagesForCurrent()
@@ -549,6 +576,48 @@ struct ChatView: View {
         playingVoiceId = nil
     }
 
+    /// 发送图片数据（压缩到 1280px）
+    private func sendImageData(_ data: Data) {
+        guard let img = UIImage(data: data) else { return }
+        let resized = img.resized(maxSide: 1280)
+        let jpeg = resized.jpegData(compressionQuality: 0.8) ?? data
+        let b64 = jpeg.base64EncodedString()
+        if isAI {
+            let msg = ChatMessage(role: "user", text: "", imageBase64: b64)
+            messages.append(msg)
+            sendAI(text: "", imageBase64: b64)
+        } else {
+            let msg = ChatMessage(role: "user", text: "", imageBase64: b64, senderName: DeviceIdentity.shared.deviceName)
+            messages.append(msg)
+            appState.conn.sendImage(base64: b64, target: appState.chatPeerId, messageId: msg.id)
+        }
+    }
+
+    /// 发送视频数据（压缩转码 mp4）
+    private func sendVideoData(_ data: Data) {
+        // 视频时长
+        var duration: Double = 0
+        if let asset = try? AVURLAsset(url: URL(fileURLWithPath: NSTemporaryDirectory()).appendingPathComponent("tmp_video_\(Date().timeIntervalSince1970).mp4")) {
+            duration = CMTimeGetSeconds(asset.duration)
+        }
+        // 直接保存临时文件取时长
+        let tmpURL = FileManager.default.temporaryDirectory.appendingPathComponent("evo_video_\(Date().timeIntervalSince1970).mp4")
+        try? data.write(to: tmpURL)
+        let asset = AVURLAsset(url: tmpURL)
+        duration = CMTimeGetSeconds(asset.duration)
+        let b64 = data.base64EncodedString()
+        if isAI {
+            let msg = ChatMessage(role: "user", text: "", videoBase64: b64, videoDurationMs: duration * 1000)
+            messages.append(msg)
+            sendAI(text: "[视频 \(Int(duration))s]")
+        } else {
+            let msg = ChatMessage(role: "user", text: "", videoBase64: b64, videoDurationMs: duration * 1000, senderName: DeviceIdentity.shared.deviceName)
+            messages.append(msg)
+            appState.conn.sendVideo(base64: b64, target: appState.chatPeerId, durationMs: duration * 1000, messageId: msg.id)
+        }
+        try? FileManager.default.removeItem(at: tmpURL)
+    }
+
     /// 发送文件（Base64 传输，带文件名）
     private func sendFile(name: String, data: Data) {
         let b64 = data.base64EncodedString()
@@ -581,6 +650,13 @@ struct ChatView: View {
         }
     }
 
+    /// 发送拍摄的视频
+    private func sendCameraVideo(_ url: URL) {
+        guard let data = try? Data(contentsOf: url) else { return }
+        sendVideoData(data)
+        try? FileManager.default.removeItem(at: url)
+    }
+
     private func regenerateAIResponse(for message: ChatMessage) {
         guard isAI, !isStreaming,
               let messageIndex = messages.firstIndex(where: { $0.id == message.id }),
@@ -605,6 +681,8 @@ struct MessageBubble: View {
     var avatarState: AvatarState = .idle
     var autoExpandReasoning: Bool = false
     var onResend: (() -> Void)? = nil
+    var onImageTap: ((UIImage) -> Void)? = nil
+    var onVideoTap: ((String) -> Void)? = nil
 
     /// 送达状态图标（自己发的消息：✓ 已发送 / ✓✓ 已送达 / ! 失败）
     @ViewBuilder
@@ -625,10 +703,25 @@ struct MessageBubble: View {
         }
     }
 
+    /// 消息时间格式化（今天只显示时间，其他显示日期+时间）
+    static func timeString(_ date: Date) -> String {
+        let cal = Calendar.current
+        let f = DateFormatter()
+        if cal.isDateInToday(date) {
+            f.dateFormat = "HH:mm"
+        } else if cal.isDate(date, equalTo: Date(), toGranularity: .year) {
+            f.dateFormat = "M月d日 HH:mm"
+        } else {
+            f.dateFormat = "yyyy/M/d HH:mm"
+        }
+        return f.string(from: date)
+    }
+
     init(msg: ChatMessage, isMine: Bool, isAI: Bool, deviceName: String,
          playingVoiceId: String?, onPlayVoice: @escaping (ChatMessage) -> Void,
          onStopVoice: @escaping () -> Void, avatarState: AvatarState = .idle,
-         autoExpandReasoning: Bool = false, onResend: (() -> Void)? = nil) {
+         autoExpandReasoning: Bool = false, onResend: (() -> Void)? = nil,
+         onImageTap: ((UIImage) -> Void)? = nil, onVideoTap: ((String) -> Void)? = nil) {
         self.msg = msg
         self.isMine = isMine
         self.isAI = isAI
@@ -639,6 +732,8 @@ struct MessageBubble: View {
         self.avatarState = avatarState
         self.autoExpandReasoning = autoExpandReasoning
         self.onResend = onResend
+        self.onImageTap = onImageTap
+        self.onVideoTap = onVideoTap
         // 流式中思考默认展开
         _isReasoningExpanded = State(initialValue: autoExpandReasoning)
     }
@@ -723,11 +818,25 @@ struct MessageBubble: View {
                             }
                         }
                         if !msg.imageBase64.isEmpty, let data = Data(base64Encoded: msg.imageBase64), let ui = UIImage(data: data) {
-                            Image(uiImage: ui)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxWidth: 240)
-                                .cornerRadius(12)
+                            // 图片：点击全屏查看
+                            Button {
+                                onImageTap?(ui)
+                            } label: {
+                                Image(uiImage: ui)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxWidth: 240)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        // 视频消息：缩略图 + 播放按钮 + 时长（点击全屏播放）
+                        if !msg.videoBase64.isEmpty {
+                            VideoBubbleCard(
+                                videoBase64: msg.videoBase64,
+                                durationMs: msg.videoDurationMs,
+                                onPlay: { onVideoTap?(msg.videoBase64) }
+                            )
                         }
                         if !msg.text.isEmpty {
                             Text(renderRichText(msg.text))
@@ -735,6 +844,11 @@ struct MessageBubble: View {
                                 .foregroundColor(Theme.textPrimary)
                                 .textSelection(.enabled)
                         }
+                        // 时间显示
+                        Text(Self.timeString(msg.createdAt))
+                            .font(.system(size: 9))
+                            .foregroundColor(Theme.textTertiary)
+                            .padding(.top, 1)
                         // 工具卡片（时间/日历/天气/定位/代码运行）——所有消息都支持
                         if !msg.text.isEmpty {
                             let cards = extractToolCards(from: msg.text)
@@ -754,11 +868,25 @@ struct MessageBubble: View {
                 } else {
                     VStack(alignment: isMine ? .trailing : .leading, spacing: 4) {
                         if !msg.imageBase64.isEmpty, let data = Data(base64Encoded: msg.imageBase64), let ui = UIImage(data: data) {
-                            Image(uiImage: ui)
-                                .resizable()
-                                .scaledToFit()
-                                .frame(maxWidth: 240)
-                                .cornerRadius(12)
+                            // 图片：点击全屏查看
+                            Button {
+                                onImageTap?(ui)
+                            } label: {
+                                Image(uiImage: ui)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .frame(maxWidth: 240)
+                                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        // 视频消息：缩略图 + 播放按钮 + 时长（点击全屏播放）
+                        if !msg.videoBase64.isEmpty {
+                            VideoBubbleCard(
+                                videoBase64: msg.videoBase64,
+                                durationMs: msg.videoDurationMs,
+                                onPlay: { onVideoTap?(msg.videoBase64) }
+                            )
                         }
                         // 语音消息：▶ 播放按钮 + 时长
                         if !msg.voiceBase64.isEmpty {
@@ -1343,6 +1471,8 @@ struct MessageListView: View {
     let onRegenerate: (ChatMessage) -> Void
     let onDelete: (ChatMessage) -> Void
     let onResend: ((ChatMessage) -> Void)?
+    let onImageTap: ((UIImage) -> Void)?
+    let onVideoTap: ((String) -> Void)?
     let onCountChange: (ScrollViewProxy) -> Void
     let onStreamChange: (ScrollViewProxy) -> Void
 
@@ -1365,7 +1495,9 @@ struct MessageListView: View {
                             onPlayVoice: onPlayVoice,
                             onStopVoice: onStopVoice,
                             avatarState: avatarState,
-                            onResend: { onResend?(msg) }
+                            onResend: { onResend?(msg) },
+                            onImageTap: onImageTap,
+                            onVideoTap: onVideoTap
                         )
                         .id(msg.id)
                         .contextMenu {

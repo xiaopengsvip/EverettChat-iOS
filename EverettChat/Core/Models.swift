@@ -9,6 +9,8 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     var imageBase64: String = ""
     var voiceBase64: String = ""
     var voiceDurationMs: Double = 0
+    var videoBase64: String = ""
+    var videoDurationMs: Double = 0
     var reasoning: String = ""
     var senderName: String = ""
     var senderId: String = ""
@@ -16,7 +18,7 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     var status: String = "sent"   // sent | delivered | failed
     var createdAt: Date = Date()
 
-    init(id: String = UUID().uuidString, role: String, text: String, imageBase64: String = "", voiceBase64: String = "", voiceDurationMs: Double = 0, reasoning: String = "",
+    init(id: String = UUID().uuidString, role: String, text: String, imageBase64: String = "", voiceBase64: String = "", voiceDurationMs: Double = 0, videoBase64: String = "", videoDurationMs: Double = 0, reasoning: String = "",
          senderName: String = "", senderId: String = "", isError: Bool = false, status: String = "sent") {
         self.id = id
         self.role = role
@@ -24,6 +26,8 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         self.imageBase64 = imageBase64
         self.voiceBase64 = voiceBase64
         self.voiceDurationMs = voiceDurationMs
+        self.videoBase64 = videoBase64
+        self.videoDurationMs = videoDurationMs
         self.reasoning = reasoning
         self.senderName = senderName
         self.senderId = senderId
@@ -32,7 +36,7 @@ struct ChatMessage: Identifiable, Codable, Equatable {
     }
 
     private enum CodingKeys: String, CodingKey {
-        case id, role, text, imageBase64, voiceBase64, voiceDurationMs, reasoning, senderName, senderId, isError, status, createdAt
+        case id, role, text, imageBase64, voiceBase64, voiceDurationMs, videoBase64, videoDurationMs, reasoning, senderName, senderId, isError, status, createdAt
     }
 
     init(from decoder: Decoder) throws {
@@ -41,6 +45,10 @@ struct ChatMessage: Identifiable, Codable, Equatable {
         role = try container.decode(String.self, forKey: .role)
         text = try container.decode(String.self, forKey: .text)
         imageBase64 = try container.decodeIfPresent(String.self, forKey: .imageBase64) ?? ""
+        voiceBase64 = try container.decodeIfPresent(String.self, forKey: .voiceBase64) ?? ""
+        voiceDurationMs = try container.decodeIfPresent(Double.self, forKey: .voiceDurationMs) ?? 0
+        videoBase64 = try container.decodeIfPresent(String.self, forKey: .videoBase64) ?? ""
+        videoDurationMs = try container.decodeIfPresent(Double.self, forKey: .videoDurationMs) ?? 0
         reasoning = try container.decodeIfPresent(String.self, forKey: .reasoning) ?? ""
         senderName = try container.decodeIfPresent(String.self, forKey: .senderName) ?? ""
         senderId = try container.decodeIfPresent(String.self, forKey: .senderId) ?? ""
