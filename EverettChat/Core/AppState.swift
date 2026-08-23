@@ -53,6 +53,9 @@ final class AppState: ObservableObject {
     func start() {
         // 启动自动应用 TTL 清理
         applyAutoDelete()
+        // 注册推送（APNs + VoIP PushKit，免费签名自动跳过）
+        PushRegistration.shared.registerAPNs()
+        PushRegistration.shared.registerVoIP()
         conn.onMessage = { [weak self] type, from, senderId, payload in
             guard let self else { return }
             switch type {

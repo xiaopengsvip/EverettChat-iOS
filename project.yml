@@ -47,7 +47,7 @@ targets:
         INFOPLIST_KEY_NSBluetoothAlwaysUsageDescription: "用于蓝牙直连"
         INFOPLIST_KEY_NSLocalNetworkUsageDescription: "用于局域网直连设备发现"
         INFOPLIST_KEY_NSBonjourServices: "_everett._tcp"
-        INFOPLIST_KEY_UIBackgroundModes: "voip,audio"
+        INFOPLIST_KEY_UIBackgroundModes: "voip,audio,remote-notification"
         INFOPLIST_KEY_NSSupportsLiveActivities: YES
         INFOPLIST_KEY_NSSupportsLiveActivitiesFrequentUpdates: YES
 

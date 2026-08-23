@@ -47,6 +47,7 @@ final class CallManager: ObservableObject {
     private var conn: ConnectionManager { ConnectionManager.shared }
     private var timer: Timer?
     private var callbacks: [String: (String, String, String, [String: Any]) -> Void] = [:]
+    private var activeCallUUID: UUID?
 
     private init() {
         // 订阅统一连接层的消息（多播，不覆盖 AppState）
@@ -66,6 +67,10 @@ final class CallManager: ObservableObject {
             peerName = from
             peerId = senderId
             callbacks[peerId] = { [weak self] t, f, sid, p in self?.handleSignal(type: t, from: f, senderId: sid, payload: p) }
+            // CallKit 系统来电界面（锁屏/后台显示）
+            CallKitAdapter.shared.reportIncomingCall(uuid: UUID(), peerName: from, hasVideo: callType == .video)
+            // 本地通知补充（无 CallKit 权限时）
+            PushRegistration.shared.showLocalNotification(title: "\(from) 来电", body: callType == .video ? "视频通话" : "语音通话")
         case "call-accept":
             if state == .outgoing {
                 state = .connecting
@@ -96,6 +101,8 @@ final class CallManager: ObservableObject {
         ])
         // 启动 WebRTC 引擎（发起 Offer）
         WebRTCEngine.shared.startCall(type: type)
+        // 启动音频会话（听筒/扬声器路由）
+        CallKitAdapter.shared.startAudioSession()
         // 超时挂断（60s 未接听）
         DispatchQueue.main.asyncAfter(deadline: .now() + 60) { [weak self] in
             if self?.state == .outgoing {
@@ -128,6 +135,11 @@ final class CallManager: ObservableObject {
         }
         // 关闭 WebRTC 引擎
         WebRTCEngine.shared.endCall()
+        // 结束 CallKit 通话（系统 UI 关闭 + 音频会话释放）
+        if let uuid = activeCallUUID {
+            CallKitAdapter.shared.endCall(uuid: uuid)
+        }
+        activeCallUUID = nil
         state = .ended
         stopTimer()
         // 延迟复位到空闲（UI 显示"通话结束"后回到空闲）
