@@ -237,14 +237,31 @@ struct DeviceLinkView: View {
                     return
                 }
                 guard let data = data,
-                      let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-                      let choices = json["choices"] as? [[String: Any]],
-                      let msg = choices.first?["message"] as? [String: Any],
-                      let content = msg["content"] as? String else {
-                    messages.append(ChatMsg(content: "响应解析失败", isUser: false))
+                      let json = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any] else {
+                    // 显示原始响应片段，便于诊断
+                    let raw = data.map { String(data: $0, encoding: .utf8) ?? "非文本响应" } ?? "无响应数据"
+                    messages.append(ChatMsg(content: "响应解析失败（原始: \(String(raw.prefix(200)))）", isUser: false))
                     return
                 }
-                messages.append(ChatMsg(content: content, isUser: false))
+                // OpenAI 错误信封
+                if let err = json["error"] as? [String: Any],
+                   let errMsg = err["message"] as? String {
+                    messages.append(ChatMsg(content: "Hermes 错误: \(errMsg)", isUser: false))
+                    return
+                }
+                guard let choices = json["choices"] as? [[String: Any]],
+                      let msg = choices.first?["message"] as? [String: Any] else {
+                    messages.append(ChatMsg(content: "响应格式异常: \(String(describing: json).prefix(200))", isUser: false))
+                    return
+                }
+                // content 可能为 null（纯工具调用/思考），宽容处理
+                if let content = msg["content"] as? String, !content.isEmpty {
+                    messages.append(ChatMsg(content: content, isUser: false))
+                } else if let reasoning = msg["reasoning_content"] as? String, !reasoning.isEmpty {
+                    messages.append(ChatMsg(content: "（思考中）\(reasoning)", isUser: false))
+                } else {
+                    messages.append(ChatMsg(content: "（Hermes 无文本输出，可能正在调用工具）", isUser: false))
+                }
             }
         }.resume()
     }
