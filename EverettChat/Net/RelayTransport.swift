@@ -30,6 +30,10 @@ final class RelayTransport: NSObject, ObservableObject {
     var onMessage: ((String, String, String, [String: Any]) -> Void)?   // type, from, senderId, payload
     var onStatusChange: ((Bool) -> Void)?
 
+    /// v1 房间密钥（PBKDF2 派生一次，复用）
+    private var roomKey: SymmetricKey?
+    private var roomSalt: Data = Data()
+
     init(deviceId: String, deviceName: String,
          room: String = PublicRelay.room,
          passphrase: String = PublicRelay.passphrase) {
@@ -38,6 +42,9 @@ final class RelayTransport: NSObject, ObservableObject {
         self.room = room
         self.passphrase = passphrase
         super.init()
+        // v1: PBKDF2 派生房间密钥（salt 与房间绑定）
+        roomSalt = CryptoEngine.roomSalt(roomId: room)
+        roomKey = CryptoEngine.deriveKey(passphrase: passphrase, salt: roomSalt)
         let config = URLSessionConfiguration.default
         config.waitsForConnectivity = false
         config.timeoutIntervalForRequest = 300
@@ -85,7 +92,7 @@ final class RelayTransport: NSObject, ObservableObject {
     }
 
     private func handleIncoming(_ text: String) {
-        guard let parsed = CryptoEngine.parseMessage(text, passphrase: passphrase) else { return }
+        guard let parsed = CryptoEngine.parseMessage(text) else { return }
         switch parsed.type {
         case "welcome":
             isConnected = true
@@ -104,13 +111,20 @@ final class RelayTransport: NSObject, ObservableObject {
             }
         default:
             var payload = parsed.payload
-            if ["text", "image"].contains(parsed.type),
-               let data = payload["data"] as? String,
-               let plain = CryptoEngine.decrypt(data, passphrase: passphrase) {
-                payload["data"] = plain
+            // v1: 加密 payload 含 v/nonce/ct → 解密出明文内容
+            if ["text", "image", "voice", "video"].contains(parsed.type),
+               let key = roomKey,
+               let plain = CryptoEngine.parseV1Payload(payload, key: key) {
+                // text: 明文即内容；image/voice/video: 明文是 JSON，解析后合并
+                if parsed.type == "text" {
+                    payload["content"] = plain
+                } else if let data = plain.data(using: .utf8),
+                          let inner = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+                    for (k, v) in inner { payload[k] = v }
+                }
             }
             // 收到业务消息 → 自动回 ACK（携带原消息 id）
-            if ["text", "image", "voice"].contains(parsed.type),
+            if ["text", "image", "voice", "video"].contains(parsed.type),
                let messageId = payload["messageId"] as? String, !messageId.isEmpty {
                 sendAck(messageId: messageId, target: parsed.senderId)
             }
@@ -164,11 +178,12 @@ final class RelayTransport: NSObject, ObservableObject {
         webSocket?.send(.string(text)) { _ in }
     }
 
-    /// 发送加密消息（E2E），messageId 用于送达确认
+    /// 发送加密消息（v1：PBKDF2+AES-GCM envelope），messageId 用于送达确认
     func sendEncrypted(type: String, target: String, content: String, messageId: String = "") {
-        guard let enc = CryptoEngine.encrypt(content, passphrase: passphrase) else { return }
-        var payload: [String: Any] = ["data": enc, "target": target]
-        if !messageId.isEmpty { payload["messageId"] = messageId }
+        guard let key = roomKey,
+              let payload = CryptoEngine.makeV1Payload(plaintext: content, key: key,
+                                                       salt: roomSalt, target: target,
+                                                       messageId: messageId) else { return }
         sendRaw(type: type, target: target, payload: payload)
     }
 
@@ -177,20 +192,20 @@ final class RelayTransport: NSObject, ObservableObject {
         sendEncrypted(type: "text", target: target, content: text, messageId: messageId)
     }
 
-    /// 发送图片消息，data 字段保持端到端加密
+    /// 发送图片消息（v1：data/name/mime/text 打包成 JSON 后整体加密）
     func sendImage(base64: String, target: String, name: String = "image.jpg", mime: String = "image/jpeg", text: String = "", messageId: String = "") {
-        guard let enc = CryptoEngine.encrypt(base64, passphrase: passphrase) else { return }
-        var payload: [String: Any] = ["data": enc, "name": name, "mime": mime, "text": text, "target": target]
-        if !messageId.isEmpty { payload["messageId"] = messageId }
-        sendRaw(type: "image", target: target, payload: payload)
+        let inner: [String: Any] = ["data": base64, "name": name, "mime": mime, "text": text]
+        guard let json = try? JSONSerialization.data(withJSONObject: inner),
+              let jsonStr = String(data: json, encoding: .utf8) else { return }
+        sendEncrypted(type: "image", target: target, content: jsonStr, messageId: messageId)
     }
 
-    /// 发送语音消息（AAC m4a Base64），data 字段端到端加密
+    /// 发送语音消息（v1：data/mime/durationMs 打包 JSON 加密）
     func sendVoice(base64: String, target: String, durationMs: Double, mime: String = "audio/m4a", messageId: String = "") {
-        guard let enc = CryptoEngine.encrypt(base64, passphrase: passphrase) else { return }
-        var payload: [String: Any] = ["data": enc, "mime": mime, "durationMs": durationMs, "target": target]
-        if !messageId.isEmpty { payload["messageId"] = messageId }
-        sendRaw(type: "voice", target: target, payload: payload)
+        let inner: [String: Any] = ["data": base64, "mime": mime, "durationMs": durationMs]
+        guard let json = try? JSONSerialization.data(withJSONObject: inner),
+              let jsonStr = String(data: json, encoding: .utf8) else { return }
+        sendEncrypted(type: "voice", target: target, content: jsonStr, messageId: messageId)
     }
 
     /// 发送送达确认（ACK）
@@ -198,12 +213,12 @@ final class RelayTransport: NSObject, ObservableObject {
         sendRaw(type: "ack", target: target, payload: ["ackId": messageId, "target": target])
     }
 
-    /// 发送视频消息
+    /// 发送视频消息（v1：data/mime/durationMs 打包 JSON 加密）
     func sendVideo(base64: String, target: String, durationMs: Double, mime: String = "video/mp4", messageId: String = "") {
-        guard let enc = CryptoEngine.encrypt(base64, passphrase: passphrase) else { return }
-        var payload: [String: Any] = ["data": enc, "mime": mime, "durationMs": durationMs, "target": target]
-        if !messageId.isEmpty { payload["messageId"] = messageId }
-        sendRaw(type: "video", target: target, payload: payload)
+        let inner: [String: Any] = ["data": base64, "mime": mime, "durationMs": durationMs]
+        guard let json = try? JSONSerialization.data(withJSONObject: inner),
+              let jsonStr = String(data: json, encoding: .utf8) else { return }
+        sendEncrypted(type: "video", target: target, content: jsonStr, messageId: messageId)
     }
 
     /// 查询在线用户

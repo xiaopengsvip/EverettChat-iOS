@@ -72,7 +72,7 @@ final class AppState: ObservableObject {
                 let requestSenderId = payload["senderId"] as? String ?? senderId
                 self.pendingFriendRequest = (id: requestSenderId, name: name)
             case "text":
-                guard let text = payload["data"] as? String else { return }
+                guard let text = payload["content"] as? String else { return }
                 let message = ChatMessage(role: "peer", text: text, senderName: from, senderId: senderId)
                 self.peerMessages.append(message)
                 self.updatePeerConversation(senderId: senderId, name: from, lastText: text, time: message.createdAt)
