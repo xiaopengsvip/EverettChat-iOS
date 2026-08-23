@@ -89,7 +89,7 @@ final class DeviceManager: NSObject, ObservableObject {
                 type = "bluetooth"; isBt = true
             case .headphones, .headsetMic:
                 type = "wired"
-            case .receiver:
+            case .builtInReceiver:
                 type = "receiver"
             case .builtInSpeaker:
                 type = "speaker"
