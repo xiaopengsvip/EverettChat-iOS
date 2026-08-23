@@ -16,6 +16,15 @@ struct DeviceLinkView: View {
 
     private var baseURL: String { "http://\(host):\(port)" }
 
+    /// 禁用系统代理直连（局域网设备互联不受 VPN/HTTP 代理干扰）
+    private var directSession: URLSession {
+        let config = URLSessionConfiguration.ephemeral
+        config.connectionProxyDictionary = [:]
+        config.timeoutIntervalForRequest = 120
+        config.timeoutIntervalForResource = 180
+        return URLSession(configuration: config)
+    }
+
     var body: some View {
         NavigationStack {
             List {
@@ -179,7 +188,7 @@ struct DeviceLinkView: View {
         var req = URLRequest(url: requestURL)
         req.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
         req.timeoutInterval = 10
-        URLSession.shared.dataTask(with: req) { data, _, error in
+        directSession.dataTask(with: req) { data, _, error in
             DispatchQueue.main.async {
                 connecting = false
                 if let error = error {
@@ -229,7 +238,7 @@ struct DeviceLinkView: View {
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.timeoutInterval = 120
 
-        URLSession.shared.dataTask(with: req) { data, _, error in
+        directSession.dataTask(with: req) { data, _, error in
             DispatchQueue.main.async {
                 isSending = false
                 if let error = error {
