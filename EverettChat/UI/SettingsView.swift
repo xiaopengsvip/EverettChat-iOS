@@ -73,19 +73,16 @@ struct SettingsView: View {
 
             // 设备与通用
             Section {
-                Button {
-                    _ = DeviceIdentity.shared.rerollName()
-                    appState.objectWillChange.send()
+                NavigationLink {
+                    DeviceInfoView().environmentObject(appState)
                 } label: {
-                    SettingsRowLabel(icon: "pencil", title: "设备名称", subtitle: appState.deviceName)
+                    SettingsRowLabel(icon: "gearshape", title: "设备与通用", subtitle: "名称 / 中继 / 保活")
                 }
-                SettingsRowLabel(icon: "battery.100percent", title: "后台保活", subtitle: "前台保活 · 电池优化白名单")
                 Button {
                     showSessionPicker = true
                 } label: {
                     SettingsRowLabel(icon: "link", title: "连接保持", subtitle: SessionDuration.current.label)
                 }
-                SettingsRowLabel(icon: "server.rack", title: "中继服务器", subtitle: "已配置 · \(PublicRelay.httpURL)")
                 Button {
                     showAutoDelete = true
                 } label: {
@@ -95,7 +92,6 @@ struct SettingsView: View {
                                          return days == 0 ? "不自动删除" : "保留 \(days) 天"
                                      }())
                 }
-                SettingsRowLabel(icon: "text.bubble", title: "反馈", subtitle: "问题与建议")
             } header: {
                 Text("设备与通用")
             }
@@ -127,16 +123,13 @@ struct SettingsView: View {
                 Text("身份")
             }
 
-            // 开发者：调试模式开关（显示调试通道/EVO 测试通道）
+            // 开发者：调试模式（点击进入开发者页）
             Section {
-                Toggle(isOn: $debugMode) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("调试模式")
-                            .font(.body)
-                        Text(debugMode ? "已开启 · 显示调试通道（EVO 测试通道）" : "关闭 · 调试通道不可见")
-                            .font(.caption)
-                            .foregroundColor(Theme.textTertiary)
-                    }
+                NavigationLink {
+                    DeveloperView()
+                } label: {
+                    SettingsRowLabel(icon: "hammer", title: "开发者",
+                                     subtitle: debugMode ? "调试模式已开启" : "调试模式 · 远程日志")
                 }
             } header: {
                 Text("开发者")
