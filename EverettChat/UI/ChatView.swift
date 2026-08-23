@@ -609,7 +609,7 @@ struct ChatView: View {
         if isAI {
             let msg = ChatMessage(role: "user", text: "", videoBase64: b64, videoDurationMs: duration * 1000)
             messages.append(msg)
-            sendAI(text: "[视频 \(Int(duration))s]")
+            sendAI(text: "[视频 \(Int(duration))s]", imageBase64: "")
         } else {
             let msg = ChatMessage(role: "user", text: "", videoBase64: b64, videoDurationMs: duration * 1000, senderName: DeviceIdentity.shared.deviceName)
             messages.append(msg)
