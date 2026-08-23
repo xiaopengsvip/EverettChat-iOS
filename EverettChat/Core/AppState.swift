@@ -165,6 +165,15 @@ final class AppState: ObservableObject {
         showChat = true
     }
 
+    /// 打开 Hermes 设备互联对话（复用 ChatView 完整能力：图片/文件/语音等）
+    func openDeviceChat() {
+        chatMode = "device"
+        chatPeerName = "Hermes 设备"
+        chatPeerId = "device"
+        activeConvId = "device"
+        showChat = true
+    }
+
     func sendFriendRequest(targetId: String, targetName: String) {
         let url = URL(string: "\(PublicRelay.httpURL)/friend-request")!
         var request = URLRequest(url: url)

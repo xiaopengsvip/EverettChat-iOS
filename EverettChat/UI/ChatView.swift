@@ -54,7 +54,9 @@ struct ChatView: View {
     @State private var showImageQualityPicker = false
 
     private var isAI: Bool { appState.chatMode == "ai" }
+    private var isDevice: Bool { appState.chatMode == "device" }
     private let apiClient = ChatApiClient()
+    @StateObject private var deviceStore = DeviceLinkStore.shared
 
     var body: some View {
         VStack(spacing: 0) {
@@ -62,11 +64,11 @@ struct ChatView: View {
             ZStack {
                 // 居中标题
                 VStack(alignment: .center, spacing: 1) {
-                    Text(isAI ? "AI 助手" : appState.chatPeerName)
+                    Text(isAI ? "AI 助手" : isDevice ? "Hermes 设备" : appState.chatPeerName)
                         .font(.headline)
                         .foregroundColor(Theme.textPrimary)
                         .lineLimit(1)
-                    Text(isAI ? currentModelName : "ID: \(String(appState.chatPeerId.prefix(8)))")
+                    Text(isAI ? currentModelName : isDevice ? (deviceStore.modelName.isEmpty ? "已连接" : deviceStore.modelName) : "ID: \(String(appState.chatPeerId.prefix(8)))")
                         .font(.caption2)
                         .foregroundColor(Theme.textTertiary)
                 }
@@ -86,6 +88,8 @@ struct ChatView: View {
                         Button {
                             if isAI {
                                 FloatingChatManager.shared.open(.ai)
+                            } else if isDevice {
+                                FloatingChatManager.shared.open(.device)
                             } else {
                                 FloatingChatManager.shared.open(.peer(id: appState.chatPeerId, name: appState.chatPeerName))
                             }
@@ -362,19 +366,23 @@ struct ChatView: View {
             FullscreenVideoView(videoBase64: b64)
         }
         .onAppear {
-            messages = isAI ? appState.aiMessages : peerMessagesForCurrent()
+            messages = isAI ? appState.aiMessages : (isDevice ? deviceStore.messages : peerMessagesForCurrent())
         }
         .onReceive(appState.$peerMessages) { newValue in
-            if !isAI {
+            if !isAI && !isDevice {
                 let filtered = newValue.filter { $0.senderId == appState.chatPeerId }
                 if filtered != messages { messages = filtered }
             }
         }
         .onChange(of: messages) { newValue in
-            if isAI { appState.aiMessages = newValue } else { writeBackPeerMessages(newValue) }
+            if isAI { appState.aiMessages = newValue }
+            else if isDevice { deviceStore.messages = newValue; deviceStore.save() }
+            else { writeBackPeerMessages(newValue) }
         }
         .onDisappear {
-            if isAI { appState.aiMessages = messages } else { writeBackPeerMessages(messages) }
+            if isAI { appState.aiMessages = messages }
+            else if isDevice { deviceStore.messages = messages; deviceStore.save() }
+            else { writeBackPeerMessages(messages) }
         }
     }
 
@@ -407,11 +415,13 @@ struct ChatView: View {
         guard !text.isEmpty, !isStreaming else { return }
         input = ""
 
-        let userMsg = ChatMessage(role: "user", text: text, senderId: isAI ? "" : appState.chatPeerId)
+        let userMsg = ChatMessage(role: "user", text: text, senderId: appState.chatPeerId)
         messages.append(userMsg)
 
         if isAI {
             sendAI(text)
+        } else if isDevice {
+            sendDevice(text: text, imageBase64: "")
         } else {
             // 对端加密发送（带 messageId 用于送达确认）
             if appState.conn.isConnected {
@@ -510,6 +520,69 @@ struct ChatView: View {
 
     private func deleteMessage(_ message: ChatMessage) {
         messages.removeAll { $0.id == message.id }
+    }
+
+    // MARK: - Hermes 设备互联发送（复用完整输入能力）
+
+    /// 发送文本/图片给本机 Hermes（OpenAI 兼容 API，直连不走代理）
+    private func sendDevice(text: String, imageBase64: String) {
+        guard deviceStore.isConnected else {
+            messages.append(ChatMessage(role: "ai", text: "未连接 Hermes，请先在设备互联页连接", isError: true))
+            return
+        }
+        isStreaming = true
+        let history = messages.dropLast().map { (role: $0.role == "user" ? "user" : "assistant", content: $0.text) }
+        Task {
+            let reply = await deviceSendRequest(history: history, userMessage: text, imageBase64: imageBase64)
+            await MainActor.run {
+                isStreaming = false
+                if let reply, !reply.isEmpty {
+                    messages.append(ChatMessage(role: "ai", text: reply))
+                } else {
+                    messages.append(ChatMessage(role: "ai", text: "（无回复）", isError: true))
+                }
+                deviceStore.messages = messages
+                deviceStore.lastMessageTime = Date()
+                deviceStore.save()
+            }
+        }
+    }
+
+    /// 设备互联 HTTP 请求（支持图片 base64）
+    private func deviceSendRequest(history: [(role: String, content: String)], userMessage: String, imageBase64: String) async -> String? {
+        var msgs: [[String: Any]] = []
+        for h in history {
+            msgs.append(["role": h.role, "content": h.content])
+        }
+        if imageBase64.isEmpty {
+            msgs.append(["role": "user", "content": userMessage])
+        } else {
+            // 多模态：文本 + 图片（OpenAI 兼容格式）
+            var parts: [[String: Any]] = [["type": "text", "text": userMessage]]
+            parts.append(["type": "image_url", "image_url": ["url": "data:image/jpeg;base64,\(imageBase64)"]])
+            msgs.append(["role": "user", "content": parts])
+        }
+        let payload: [String: Any] = ["model": "hermes-agent", "messages": msgs]
+        guard let url = URL(string: "http://\(deviceStore.host):\(deviceStore.port)/v1/chat/completions"),
+              let body = try? JSONSerialization.data(withJSONObject: payload) else { return nil }
+        var req = URLRequest(url: url)
+        req.httpMethod = "POST"
+        req.httpBody = body
+        req.setValue("Bearer \(deviceStore.apiKey)", forHTTPHeaderField: "Authorization")
+        req.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        req.timeoutInterval = 120
+        do {
+            let (data, _) = try await URLSession(configuration: .ephemeral).data(for: req)
+            if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+               let choices = json["choices"] as? [[String: Any]],
+               let msg = choices.first?["message"] as? [String: Any],
+               let content = msg["content"] as? String, !content.isEmpty {
+                return content
+            }
+            return nil
+        } catch {
+            return nil
+        }
     }
 
     // MARK: - 语音录制与播放
@@ -625,6 +698,11 @@ struct ChatView: View {
             let msg = ChatMessage(role: "user", text: "", imageBase64: b64, hasOriginal: original)
             messages.append(msg)
             sendAI(text: "", imageBase64: b64)
+        } else if isDevice {
+            // Hermes 设备：图片 → 多模态请求
+            let msg = ChatMessage(role: "user", text: "（图片）", imageBase64: b64, hasOriginal: original)
+            messages.append(msg)
+            sendDevice(text: "请查看这张图片", imageBase64: b64)
         } else {
             let msg = ChatMessage(role: "user", text: "", imageBase64: b64, hasOriginal: original, senderName: DeviceIdentity.shared.deviceName)
             messages.append(msg)

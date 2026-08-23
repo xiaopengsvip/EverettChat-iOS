@@ -5,7 +5,6 @@ struct MessagesView: View {
     @EnvironmentObject var appState: AppState
     @Binding var showAddSheet: Bool
     @State private var searchQuery = ""
-    @State private var showDeviceLink = false
     @StateObject private var deviceStore = DeviceLinkStore.shared
 
     private var filteredPeers: [Conversation] {
@@ -48,7 +47,7 @@ struct MessagesView: View {
                     time: deviceStore.messages.isEmpty ? "" : Self.formatTime(deviceStore.lastMessageTime),
                     accent: false
                 ) {
-                    showDeviceLink = true
+                    appState.openDeviceChat()
                 }
                 .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                 .contextMenu {
@@ -111,9 +110,6 @@ struct MessagesView: View {
             ToolbarItem(placement: .topBarTrailing) {
                 TitleBarButton(icon: "plus") { showAddSheet = true }
             }
-        }
-        .sheet(isPresented: $showDeviceLink) {
-            DeviceLinkView()
         }
     }
 

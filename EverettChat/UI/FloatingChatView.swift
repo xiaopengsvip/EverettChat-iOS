@@ -331,24 +331,15 @@ struct FloatingChatView: View {
         appState.conn.sendText(text, target: id, messageId: msg.id)
     }
 
-    // MARK: - Hermes 设备会话
+    // MARK: - Hermes 设备会话（浮窗内完整对话，复用 ChatMessage 模型）
     private var deviceChat: some View {
         VStack(spacing: 0) {
             ScrollViewReader { proxy in
                 ScrollView {
                     LazyVStack(spacing: 8) {
                         ForEach(deviceStore.messages) { msg in
-                            HStack {
-                                if msg.isUser { Spacer(minLength: 24) }
-                                Text(msg.content)
-                                    .font(.footnote)
-                                    .padding(.horizontal, 10)
-                                    .padding(.vertical, 7)
-                                    .background(msg.isUser ? Color.accentColor.opacity(0.15) : Color(.tertiarySystemFill))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-                                if !msg.isUser { Spacer(minLength: 24) }
-                            }
-                            .id(msg.id)
+                            miniBubble(msg: msg)
+                                .id(msg.id)
                         }
                         if isDeviceSending {
                             HStack {
@@ -397,14 +388,14 @@ struct FloatingChatView: View {
         let text = deviceInput.trimmingCharacters(in: .whitespaces)
         guard !text.isEmpty, !isDeviceSending else { return }
         deviceInput = ""
-        deviceStore.messages.append(ChatMsg(content: text, isUser: true))
+        deviceStore.messages.append(ChatMessage(role: "user", text: text, senderId: "device"))
         deviceStore.lastMessageTime = Date()
         isDeviceSending = true
         deviceStatus = ""
 
         let payload: [String: Any] = [
             "model": "hermes-agent",
-            "messages": deviceStore.messages.map { ["role": $0.isUser ? "user" : "assistant", "content": $0.content] }
+            "messages": deviceStore.messages.map { ["role": $0.role == "user" ? "user" : "assistant", "content": $0.text] }
         ]
         guard let url = URL(string: "http://\(deviceStore.host):\(deviceStore.port)/v1/chat/completions"),
               let body = try? JSONSerialization.data(withJSONObject: payload) else {
@@ -433,7 +424,7 @@ struct FloatingChatView: View {
                     deviceStatus = "响应解析失败"
                     return
                 }
-                deviceStore.messages.append(ChatMsg(content: content, isUser: false))
+                deviceStore.messages.append(ChatMessage(role: "ai", text: content))
                 deviceStore.lastMessageTime = Date()
                 deviceStore.save()
             }
