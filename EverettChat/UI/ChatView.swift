@@ -274,14 +274,14 @@ struct ChatView: View {
         }
         // 相机模式选择（拍照/录像）
         .confirmationDialog("拍摄", isPresented: $showCameraModePicker, titleVisibility: .visible) {
-            Button("📷 拍照") {
-                cameraMode = .photo
-                showCamera = true
-            }
-            Button("🎥 录像") {
-                cameraMode = .video
-                showCamera = true
-            }
+            Button {
+                                cameraMode = .photo
+                                showCamera = true
+                            } label: { Label("拍照", systemImage: "camera") }
+                            Button {
+                                cameraMode = .video
+                                showCamera = true
+                            } label: { Label("录像", systemImage: "video") }
             Button("取消", role: .cancel) {}
         }
         // 相册（图片 + 视频）
@@ -383,7 +383,7 @@ struct ChatView: View {
         isStreaming ? .speaking : (isAI ? .idle : .idle)
     }
     private var currentModelName: String { currentModel.name }
-    private var currentModelIcon: String { currentModel.vision ? "👁" : "🤖" }
+    private var currentModelIcon: String { currentModel.vision ? "eye.fill" : "sparkles" }
     private var streamContent: String { apiClient.streamText }
     private var streamReasoning: String { apiClient.reasoningText }
 
@@ -791,7 +791,7 @@ struct MessageBubble: View {
                         Circle()
                             .fill(Theme.surfaceAlt)
                             .frame(width: 36, height: 36)
-                            .overlay(Text("👤").font(.system(size: 18)))
+                            .overlay(Image(systemName: "person.fill").font(.system(size: 12)).foregroundColor(Theme.textSecondary))
                     }
                 }
             } else {
@@ -1051,7 +1051,7 @@ struct MessageBubble: View {
                 Circle()
                     .fill(Theme.surfaceAlt)
                     .frame(width: 36, height: 36)
-                    .overlay(Text("👤").font(.system(size: 18)))
+                    .overlay(Image(systemName: "person.fill").font(.system(size: 12)).foregroundColor(Theme.textSecondary))
             } else {
                 Color.clear.frame(width: 44, height: 44)
             }
@@ -1075,7 +1075,10 @@ struct ModelPickerSheet: View {
                     dismiss()
                 } label: {
                     HStack(spacing: 14) {
-                        Text(m.vision ? "👁" : "🤖").font(.title3)
+                        Image(systemName: m.vision ? "eye.fill" : "sparkles")
+                            .font(.system(size: 20))
+                            .foregroundColor(m.vision ? Theme.info : Theme.primary)
+                            .frame(width: 28)
                         VStack(alignment: .leading) {
                             Text(m.name)
                                 .font(.body.weight(selected == m.id ? .semibold : .regular))
@@ -1113,7 +1116,7 @@ struct ChatInfoSheet: View {
                 Circle()
                     .fill(isAI ? Theme.primaryDim : Theme.surfaceAlt)
                     .frame(width: 52, height: 52)
-                    .overlay(Text(isAI ? "🤖" : "👤").font(.title3))
+                    .overlay(Image(systemName: isAI ? "sparkles" : "person.fill").font(.system(size: 24)).foregroundColor(Theme.primary))
                 VStack(alignment: .leading) {
                     Text(isAI ? "AI 助手" : appState.chatPeerName)
                         .font(.headline)
@@ -1129,17 +1132,17 @@ struct ChatInfoSheet: View {
             Divider().overlay(Theme.surfaceHigh)
 
             if isAI {
-                InfoRow(icon: "🤖", title: "当前模型", subtitle: "DeepSeek V4")
-                InfoRow(icon: "🔐", title: "加密说明", subtitle: "AI 对话经云端中继代理，非端到端加密")
+                InfoRow(icon: "brain.head.profile", title: "当前模型", subtitle: "DeepSeek V4")
+                InfoRow(icon: "antenna.radiowaves.left.and.right", title: "加密说明", subtitle: "AI 对话经云端中继代理，非端到端加密")
                 Button {
                     appState.aiMessages.removeAll()
                     dismiss()
                 } label: {
-                    InfoRow(icon: "🧹", title: "清除对话", subtitle: "清空当前 AI 会话历史")
+                    InfoRow(icon: "trash", title: "清除对话", subtitle: "清空当前 AI 会话历史")
                 }
             } else {
-                InfoRow(icon: "🔗", title: "连接状态", subtitle: "中继连接")
-                InfoRow(icon: "🔐", title: "加密说明", subtitle: "端到端加密 · 消息仅双方可见")
+                InfoRow(icon: "link.icloud", title: "连接状态", subtitle: "中继连接")
+                InfoRow(icon: "lock.shield", title: "加密说明", subtitle: "端到端加密 · 消息仅双方可见")
             }
             Spacer()
         }
@@ -1149,13 +1152,16 @@ struct ChatInfoSheet: View {
 }
 
 struct InfoRow: View {
-    let icon: String
+    let icon: String  // SF Symbol
     let title: String
     let subtitle: String
 
     var body: some View {
         HStack(spacing: 14) {
-            Text(icon).font(.body)
+            Image(systemName: icon)
+                .font(.system(size: 17))
+                .foregroundColor(Theme.primary)
+                .frame(width: 28)
             VStack(alignment: .leading) {
                 Text(title).font(.body).foregroundColor(Theme.textPrimary)
                 Text(subtitle).font(.caption).foregroundColor(Theme.textTertiary)
@@ -1601,10 +1607,15 @@ struct MessageListView: View {
         ScrollViewReader { proxy in
             ScrollView {
                 LazyVStack(spacing: 8) {
-                    Text(isAI ? "🤖 与 AI 助手对话 · 经云端中继" : "🔐 端到端加密 · 消息仅双方可见")
-                        .font(.caption2)
-                        .foregroundColor(Theme.textTertiary)
-                        .padding(.vertical, 4)
+                    HStack(spacing: 6) {
+                        Image(systemName: isAI ? "sparkles" : "lock.shield")
+                            .font(.system(size: 10))
+                            .foregroundColor(Theme.textTertiary)
+                        Text(isAI ? "与 AI 助手对话 · 经云端中继" : "端到端加密 · 消息仅双方可见")
+                            .font(.caption2)
+                            .foregroundColor(Theme.textTertiary)
+                    }
+                    .padding(.vertical, 4)
 
                     ForEach(messages) { msg in
                         MessageBubble(

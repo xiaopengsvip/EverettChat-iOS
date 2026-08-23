@@ -18,13 +18,6 @@ struct RootView: View {
                 NavigationStack {
                     MessagesView(showAddSheet: $showAddSheet)
                         .navigationTitle("消息")
-                        .toolbar {
-                            ToolbarItem(placement: .navigationBarTrailing) {
-                                TitleBarButton(icon: "plus") {
-                                    showAddSheet = true
-                                }
-                            }
-                        }
                 }
                 .tabItem {
                     Label("消息", systemImage: appState.selectedTab == .messages ? "message.fill" : "message")
@@ -83,6 +76,8 @@ struct RootView: View {
         }
         // 主题切换时强制重建整棵视图树（实时响应，不残留旧色）
         .id(themeVersion)
+        // 主题模式 → 系统色系（light/dark/system 跟随）
+        .preferredColorScheme(themeColorScheme)
         .animation(.easeInOut(duration: 0.2), value: appState.showChat)
         // 全局通话弹窗
         .fullScreenCover(isPresented: $showCall) {
@@ -111,6 +106,14 @@ struct RootView: View {
         }
         .sheet(isPresented: $appState.showMyQr) {
             MyQrCodeView()
+        }
+    }
+
+    private var themeColorScheme: ColorScheme? {
+        switch UserDefaults.standard.string(forKey: "theme_mode") ?? "system" {
+        case "light": return .light
+        case "dark": return .dark
+        default: return nil
         }
     }
 

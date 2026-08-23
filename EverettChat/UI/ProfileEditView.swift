@@ -12,28 +12,7 @@ struct ProfileEditView: View {
     @State private var saved = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 顶栏
-            ZStack {
-                HStack {
-                    Button { dismiss() } label: {
-                        Image(systemName: "chevron.left").font(.system(size: 18, weight: .medium)).foregroundColor(Theme.textPrimary)
-                    }
-                    Spacer()
-                    Button("保存") {
-                        save()
-                    }
-                    .font(.body.weight(.semibold))
-                    .foregroundColor(Theme.primary)
-                    .disabled(saved)
-                }
-                Text("个人资料").font(.headline).foregroundColor(Theme.textPrimary)
-            }
-            .padding(.horizontal, Spacing.lg)
-            .padding(.vertical, Spacing.sm)
-            .background(Theme.bgAlt)
-            .overlay(alignment: .bottom) { Divider().overlay(Theme.outline) }
-
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 16) {
                     // 头像（点击更换）
@@ -49,7 +28,7 @@ struct ProfileEditView: View {
                                 Circle()
                                     .fill(Theme.surfaceAlt)
                                     .frame(width: 100, height: 100)
-                                    .overlay(Text("👤").font(.system(size: 40)))
+                                    .overlay(Image(systemName: "person.fill").font(.system(size: 40)).foregroundColor(Theme.textSecondary))
                             }
                             Text("点击更换头像")
                                 .font(.caption)
@@ -70,25 +49,25 @@ struct ProfileEditView: View {
 
                     // 资料卡片
                     VStack(spacing: 0) {
-                        ProfileFieldRow(icon: "📛", label: "昵称") {
+                        ProfileFieldRow(icon: "person.text.rectangle", label: "昵称") {
                             TextField("请输入昵称", text: $name)
                                 .textFieldStyle(.plain)
                                 .foregroundColor(Theme.textPrimary)
                         }
                         Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        ProfileFieldRow(icon: "✏️", label: "个性签名") {
+                        ProfileFieldRow(icon: "pencil", label: "个性签名") {
                             TextField("介绍一下自己吧", text: $signature)
                                 .textFieldStyle(.plain)
                                 .foregroundColor(Theme.textPrimary)
                         }
                         Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        ProfileFieldRow(icon: "📱", label: "设备名称") {
+                        ProfileFieldRow(icon: "iphone", label: "设备名称") {
                             TextField("设备名称", text: $deviceName)
                                 .textFieldStyle(.plain)
                                 .foregroundColor(Theme.textPrimary)
                         }
                         Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        ProfileFieldRow(icon: "🆔", label: "我的 ID") {
+                        ProfileFieldRow(icon: "number", label: "我的 ID") {
                             Text(DeviceIdentity.shared.shortId)
                                 .font(.caption.monospaced())
                                 .foregroundColor(Theme.textTertiary)
@@ -108,6 +87,16 @@ struct ProfileEditView: View {
                     }
                 }
                 .padding(.vertical, Spacing.md)
+            }
+            .navigationTitle("个人资料")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("保存") { save() }
+                        .font(.body.weight(.semibold))
+                        .foregroundColor(Theme.primary)
+                        .disabled(saved)
+                }
             }
         }
         .background(Theme.bg)
@@ -139,7 +128,10 @@ struct ProfileFieldRow<Content: View>: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Text(icon).font(.body)
+            Image(systemName: icon)
+                .font(.system(size: 17))
+                .foregroundColor(Theme.primary)
+                .frame(width: 28)
             Text(label)
                 .font(.body)
                 .foregroundColor(Theme.textSecondary)

@@ -161,7 +161,7 @@ struct FileTransferView: View {
         statusText = "正在发送 \(name)..."
         transfer.sendChunked(data, name: name) { success in
             sending = false
-            statusText = success ? "✅ 发送成功" : "❌ 发送失败"
+            statusText = success ? "✓ 发送成功" : "✗ 发送失败"
         }
     }
 
@@ -217,7 +217,7 @@ struct NFCSection: View {
             scanning = false
             if let msg = message {
                 nfcMessage = "读取到设备信息: \(msg)"
-                nfcResult = "✅ NFC 配对成功，开始传输"
+                nfcResult = "✓ NFC 配对成功，开始传输"
             } else {
                 nfcResult = "NFC 读取失败"
             }

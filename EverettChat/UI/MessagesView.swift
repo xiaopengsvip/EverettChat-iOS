@@ -1,68 +1,82 @@
 import SwiftUI
 
-/// 消息页（AI Inbox 风格）
+/// 消息页（系统 List + searchable）
 struct MessagesView: View {
     @EnvironmentObject var appState: AppState
     @Binding var showAddSheet: Bool
     @State private var searchQuery = ""
 
+    private var filteredPeers: [Conversation] {
+        let peers = appState.conversations
+            .filter { $0.type == "peer" }
+            .sorted { $0.lastTime > $1.lastTime }
+        guard !searchQuery.isEmpty else { return peers }
+        return peers.filter {
+            $0.name.localizedCaseInsensitiveContains(searchQuery)
+                || $0.lastText.localizedCaseInsensitiveContains(searchQuery)
+        }
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            // 搜索（系统搜索样式）
-            GlassSearchBar(text: $searchQuery, placeholder: "搜索消息")
-                .padding(.top, 8)
+        List {
+            Section {
+                ConversationRow(
+                    icon: "sparkles",
+                    name: "AI 助手",
+                    subtitle: appState.aiMessages.last?.text ?? "开始聊天吧",
+                    time: appState.aiMessages.isEmpty ? "" : "现在",
+                    accent: true
+                ) {
+                    appState.openAIChat()
+                }
+                .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
+            }
 
-            ScrollView {
-                LazyVStack(spacing: 0) {
-                    ConversationRow(
-                        icon: "sparkles",
-                        name: "AI 助手",
-                        subtitle: appState.aiMessages.last?.text ?? "开始聊天吧",
-                        time: appState.aiMessages.isEmpty ? "" : "现在",
-                        accent: true
-                    ) {
-                        appState.openAIChat()
+            if filteredPeers.isEmpty {
+                Section {
+                    VStack(spacing: Spacing.md) {
+                        Image(systemName: "bubble.left.and.bubble.right")
+                            .font(.system(size: 40))
+                            .foregroundStyle(.tertiary)
+                        Text(searchQuery.isEmpty ? "还没有聊天记录" : "没有匹配的会话")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                        Text("在「发现」连接设备，或在「通讯录」添加好友后开始加密聊天")
+                            .font(.caption)
+                            .foregroundStyle(.tertiary)
+                            .multilineTextAlignment(.center)
                     }
-                    Divider().overlay(Theme.surfaceHigh).padding(.leading, 64)
-
-                    // 对端会话（按名去重）
-                    let peerConvs = appState.conversations
-                        .filter { $0.type == "peer" }
-                        .sorted { $0.lastTime > $1.lastTime }
-                    if peerConvs.isEmpty {
-                        VStack(spacing: Spacing.md) {
-                            Spacer().frame(height: 80)
-                            Image(systemName: "bubble.left.and.bubble.right")
-                                .font(.system(size: 40))
-                                .foregroundColor(Theme.textTertiary)
-                            Text("还没有聊天记录")
-                                .font(.subheadline)
-                                .foregroundColor(Theme.textSecondary)
-                            Text("在「发现」连接设备，或在「通讯录」添加好友后开始加密聊天")
-                                .font(.caption)
-                                .foregroundColor(Theme.textTertiary)
-                                .multilineTextAlignment(.center)
-                                .padding(.horizontal, 40)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 32)
+                    .listRowBackground(Color.clear)
+                }
+            } else {
+                Section {
+                    ForEach(filteredPeers) { conv in
+                        ConversationRow(
+                            icon: "person.crop.circle",
+                            name: conv.name,
+                            subtitle: conv.lastText,
+                            time: Self.formatTime(conv.lastTime),
+                            unread: conv.unread,
+                            avatarImage: ProfileStore.shared.friendAvatar(conv.id)
+                        ) {
+                            appState.openPeerChat(name: conv.name, peerId: conv.id)
                         }
-                    } else {
-                        ForEach(peerConvs) { conv in
-                            ConversationRow(
-                                icon: "👤",
-                                name: conv.name,
-                                subtitle: conv.lastText,
-                                time: Self.formatTime(conv.lastTime),
-                                unread: conv.unread,
-                                avatarImage: ProfileStore.shared.friendAvatar(conv.id)
-                            ) {
-                                appState.openPeerChat(name: conv.name, peerId: conv.id)
-                            }
-                            Divider().overlay(Theme.surfaceHigh).padding(.leading, 64)
-                        }
+                        .listRowInsets(EdgeInsets(top: 6, leading: 16, bottom: 6, trailing: 16))
                     }
                 }
             }
         }
-        .background(Theme.bg)
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Color(.systemGroupedBackground))
+        .searchable(text: $searchQuery, prompt: "搜索消息")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                TitleBarButton(icon: "plus") { showAddSheet = true }
+            }
+        }
     }
 
     static func formatTime(_ date: Date) -> String {
@@ -121,7 +135,7 @@ struct ConversationRow: View {
                             .lineLimit(1)
                         Spacer()
                         if unread > 0 {
-                            Text("\(unread)")
+                            Text("\\(unread)")
                                 .font(.caption2.bold())
                                 .foregroundColor(.white)
                                 .padding(.horizontal, 6)
@@ -131,8 +145,6 @@ struct ConversationRow: View {
                     }
                 }
             }
-            .padding(.horizontal, Spacing.lg)
-            .padding(.vertical, Spacing.md)
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

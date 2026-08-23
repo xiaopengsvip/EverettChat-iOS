@@ -183,9 +183,9 @@ struct SettingsView: View {
             TextField("输入恢复密钥", text: $restoreInput)
             Button("恢复") {
                 if DeviceIdentity.shared.restore(fromRecoveryKey: restoreInput) {
-                    restoreResult = "✅ 身份已恢复\n新 ID: \(DeviceIdentity.shared.shortId)\n请重新添加好友"
+                    restoreResult = "✓ 身份已恢复\n新 ID: \(DeviceIdentity.shared.shortId)\n请重新添加好友"
                 } else {
-                    restoreResult = "❌ 恢复密钥无效"
+                    restoreResult = "✗ 恢复密钥无效"
                 }
             }
             Button("取消", role: .cancel) {}

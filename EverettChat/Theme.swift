@@ -26,9 +26,14 @@ enum AppTheme {
 
 /// EVO 2026 Design System: Pearl White / Deep Black
 enum Theme {
-    // Background layers
-    static var bg: Color { AppTheme.current.isDark ? Color(hex: 0x050507) : Color(hex: 0xF7F7F5) }
-    static var bgAlt: Color { AppTheme.current.isDark ? Color(hex: 0x0A0A0E) : Color(hex: 0xF1F1EF) }
+    // Text — 系统语义色（自动适配深浅色与 Dynamic Type）
+    static var textPrimary: Color { .primary }
+    static var textSecondary: Color { .secondary }
+    static var textTertiary: Color { Color(UIColor.tertiaryLabel) }
+
+    // Background layers — 系统分组背景（原生质感）
+    static var bg: Color { Color(.systemGroupedBackground) }
+    static var bgAlt: Color { Color(.secondarySystemGroupedBackground) }
     static var surface: Color { AppTheme.current.isDark ? Color(hex: 0x111114) : Color(hex: 0xFFFFFF) }
     static var surfaceHigh: Color { AppTheme.current.isDark ? Color(hex: 0x16161A) : Color(hex: 0xFAFAF9) }
     static var surfaceAlt: Color { AppTheme.current.isDark ? Color(hex: 0x1B1B20) : Color(hex: 0xF4F4F2) }
@@ -44,12 +49,6 @@ enum Theme {
     static var secondary: Color { AppTheme.current.isDark ? Color(hex: 0x7C6CFF) : Color(hex: 0x9B78FF) }
     static var primaryDim: Color { AppTheme.current.isDark ? Color(hex: 0x2A2150) : Color(hex: 0xE9E4FF) }
 
-    // Text
-    static var textPrimary: Color { AppTheme.current.isDark ? Color(hex: 0xF5F5F7) : Color(hex: 0x171717) }
-    static var textSecondary: Color { AppTheme.current.isDark ? Color(hex: 0xA1A1A6) : Color(hex: 0x6F7075) }
-    static var textTertiary: Color { AppTheme.current.isDark ? Color(hex: 0x6E6E73) : Color(hex: 0x9A9BA0) }
-
-    // Status
     static var success: Color { AppTheme.current.isDark ? Color(hex: 0x32D583) : Color(hex: 0x34C759) }
     static var error: Color { AppTheme.current.isDark ? Color(hex: 0xFF5C6C) : Color(hex: 0xFF3B30) }
     static var warning: Color { AppTheme.current.isDark ? Color(hex: 0xF5B84B) : Color(hex: 0xFF9F0A) }

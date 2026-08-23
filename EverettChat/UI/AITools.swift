@@ -482,7 +482,7 @@ struct CodeRunnerCard: View {
             // 输出
             if hasRun {
                 Divider().overlay(Theme.outline)
-                Text(output.isEmpty ? "✓ 运行完成（无输出）" : output)
+                Text(output.isEmpty ? "完成（无输出）" : output)
                     .font(.system(size: 11, design: .monospaced))
                     .foregroundColor(output.contains("Error") ? Theme.error : Theme.success)
                     .textSelection(.enabled)

@@ -1,51 +1,51 @@
 import SwiftUI
 
-/// 通讯录
+/// 通讯录（系统 List + searchable）
 struct ContactsView: View {
     @EnvironmentObject var appState: AppState
     @State private var searchQuery = ""
 
+    private var filteredUsers: [RelayTransport.OnlineUser] {
+        let users = appState.conn.onlineUsers
+        guard !searchQuery.isEmpty else { return users }
+        return users.filter { $0.name.localizedCaseInsensitiveContains(searchQuery) }
+    }
+
+    private var filteredContacts: [Contact] {
+        guard !searchQuery.isEmpty else { return appState.contacts }
+        return appState.contacts.filter {
+            $0.name.localizedCaseInsensitiveContains(searchQuery)
+                || String($0.deviceId.prefix(8)).contains(searchQuery)
+        }
+    }
+
     var body: some View {
-        VStack(spacing: 0) {
-            // 搜索（系统搜索样式）
-            GlassSearchBar(text: $searchQuery, placeholder: "搜索联系人")
-                .padding(.top, 8)
-
-            // 我的名片
-            HStack(spacing: Spacing.md) {
-                Circle().fill(Theme.surfaceAlt).frame(width: 44, height: 44)
-                    .overlay(Text("👤").font(.title3))
-                VStack(alignment: .leading) {
-                    Text(appState.deviceName).font(.body.weight(.semibold)).foregroundColor(Theme.textPrimary)
-                    Text("我的 ID: \(String(appState.deviceId.prefix(8)))")
-                        .font(.caption.monospaced()).foregroundColor(Theme.textTertiary)
-                }
-                Spacer()
-            }
-            .padding(Spacing.lg)
-
-            ScrollView {
-                // 在线用户
-                Text("在线用户").font(.caption).foregroundColor(Theme.textTertiary).padding(.leading, Spacing.lg)
-                ForEach(appState.conn.onlineUsers.filter {
-                    searchQuery.isEmpty || $0.name.contains(searchQuery)
-                }) { user in
-                    UserRow(user: user, isFriend: appState.contacts.contains { $0.deviceId == user.deviceId })
-                }
-
-                // 我的联系人
-                Text("我的联系人 (\(appState.contacts.count))")
-                    .font(.caption).foregroundColor(Theme.textTertiary).padding(.leading, Spacing.lg).padding(.top, Spacing.md)
+        List {
+            Section("我的联系人 (\\(appState.contacts.count))") {
                 if appState.contacts.isEmpty {
                     Text("暂无联系人，添加后即可长期通信")
-                        .font(.footnote).foregroundColor(Theme.textTertiary).padding(Spacing.lg)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
-                ForEach(appState.contacts) { contact in
+                ForEach(filteredContacts) { contact in
                     ContactRow(contact: contact)
+                        .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                }
+            }
+
+            if !filteredUsers.isEmpty {
+                Section("在线用户") {
+                    ForEach(filteredUsers) { user in
+                        UserRow(user: user, isFriend: appState.contacts.contains { $0.deviceId == user.deviceId })
+                            .listRowInsets(EdgeInsets(top: 4, leading: 16, bottom: 4, trailing: 16))
+                    }
                 }
             }
         }
-        .background(Theme.bg)
+        .listStyle(.insetGrouped)
+        .scrollContentBackground(.hidden)
+        .background(Color(.systemGroupedBackground))
+        .searchable(text: $searchQuery, prompt: "搜索联系人")
         .sheet(isPresented: $appState.showMyQr) { MyQrCodeView() }
     }
 }
@@ -57,10 +57,11 @@ struct UserRow: View {
 
     var body: some View {
         HStack(spacing: Spacing.md) {
-            Circle().fill(Theme.surfaceAlt).frame(width: 36, height: 36).overlay(Text("👤").font(.subheadline))
+            Circle().fill(Theme.surfaceAlt).frame(width: 40, height: 40)
+                .overlay(Image(systemName: "person.fill").font(.system(size: 16)).foregroundColor(Theme.textSecondary))
             VStack(alignment: .leading) {
                 Text(user.name).font(.body.weight(.medium)).foregroundColor(Theme.textPrimary)
-                Text("ID: \(String(user.deviceId.prefix(8)))").font(.caption.monospaced()).foregroundColor(Theme.textTertiary)
+                Text("ID: \\(String(user.deviceId.prefix(8)))").font(.caption.monospaced()).foregroundColor(Theme.textTertiary)
             }
             Spacer()
             Button(isFriend ? "已添加" : "添加") {
@@ -70,9 +71,9 @@ struct UserRow: View {
             }
             .font(.caption.weight(.medium))
             .foregroundColor(isFriend ? Theme.textTertiary : Theme.primary)
+            .disabled(isFriend)
         }
-        .padding(.horizontal, Spacing.lg)
-        .padding(.vertical, Spacing.sm)
+        .padding(.vertical, 2)
     }
 }
 
@@ -85,16 +86,16 @@ struct ContactRow: View {
             appState.openPeerChat(name: contact.name, peerId: contact.deviceId)
         } label: {
             HStack(spacing: Spacing.md) {
-                Circle().fill(Theme.surfaceAlt).frame(width: 36, height: 36).overlay(Text("👤").font(.subheadline))
+                Circle().fill(Theme.surfaceAlt).frame(width: 40, height: 40)
+                    .overlay(Image(systemName: "person.fill").font(.system(size: 16)).foregroundColor(Theme.textSecondary))
                 VStack(alignment: .leading) {
                     Text(contact.name).font(.body.weight(.medium)).foregroundColor(Theme.textPrimary)
-                    Text("ID: \(String(contact.deviceId.prefix(8)))").font(.caption.monospaced()).foregroundColor(Theme.textTertiary)
+                    Text("ID: \\(String(contact.deviceId.prefix(8)))").font(.caption.monospaced()).foregroundColor(Theme.textTertiary)
                 }
                 Spacer()
                 Image(systemName: "chevron.right").font(.caption).foregroundColor(Theme.textTertiary)
             }
-            .padding(.horizontal, Spacing.lg)
-            .padding(.vertical, Spacing.sm)
+            .padding(.vertical, 2)
         }
         .buttonStyle(.plain)
     }

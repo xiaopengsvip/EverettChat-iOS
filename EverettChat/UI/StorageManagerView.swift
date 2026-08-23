@@ -13,22 +13,7 @@ struct StorageManagerView: View {
     @State private var cleaned = false
 
     var body: some View {
-        VStack(spacing: 0) {
-            // 顶栏
-            ZStack {
-                HStack {
-                    Button { dismiss() } label: {
-                        Image(systemName: "chevron.left").font(.system(size: 18, weight: .medium)).foregroundColor(Theme.textPrimary)
-                    }
-                    Spacer()
-                }
-                Text("存储管理").font(.headline).foregroundColor(Theme.textPrimary)
-            }
-            .padding(.horizontal, Spacing.lg)
-            .padding(.vertical, Spacing.sm)
-            .background(Theme.bgAlt)
-            .overlay(alignment: .bottom) { Divider().overlay(Theme.outline) }
-
+        NavigationStack {
             ScrollView {
                 VStack(spacing: 12) {
                     // 总占用概览
@@ -44,15 +29,15 @@ struct StorageManagerView: View {
 
                     // 分类
                     VStack(spacing: 0) {
-                        StorageRow(icon: "💬", name: "聊天记录", detail: "\(chatCount) 条消息", size: chatSize)
+                        StorageRow(icon: "bubble.left.and.bubble.right", name: "聊天记录", detail: "\(chatCount) 条消息", size: chatSize)
                         Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        StorageRow(icon: "🖼", name: "图片", detail: "\(imageCount) 张", size: imageSize)
+                        StorageRow(icon: "photo", name: "图片", detail: "\(imageCount) 张", size: imageSize)
                         Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        StorageRow(icon: "🎤", name: "语音", detail: "\(voiceCount) 条", size: voiceSize)
+                        StorageRow(icon: "waveform", name: "语音", detail: "\(voiceCount) 条", size: voiceSize)
                         Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        StorageRow(icon: "📁", name: "文件", detail: "\(fileCount) 个", size: fileSize)
+                        StorageRow(icon: "folder", name: "文件", detail: "\(fileCount) 个", size: fileSize)
                         Divider().overlay(Theme.surfaceHigh).padding(.leading, 52)
-                        StorageRow(icon: "🗑", name: "缓存", detail: "临时文件", size: cacheSize)
+                        StorageRow(icon: "trash", name: "缓存", detail: "临时文件", size: cacheSize)
                     }
                     .background(
                         RoundedRectangle(cornerRadius: Radius.medium)
@@ -87,6 +72,8 @@ struct StorageManagerView: View {
                 }
                 .padding(.vertical, Spacing.md)
             }
+            .navigationTitle("存储管理")
+            .navigationBarTitleDisplayMode(.inline)
         }
         .background(Theme.bg)
         .onAppear(perform: scan)
@@ -164,7 +151,10 @@ struct StorageRow: View {
 
     var body: some View {
         HStack(spacing: 14) {
-            Text(icon).font(.title3)
+            Image(systemName: icon)
+                .font(.system(size: 17))
+                .foregroundColor(Theme.primary)
+                .frame(width: 28)
             VStack(alignment: .leading) {
                 Text(name).font(.body.weight(.medium)).foregroundColor(Theme.textPrimary)
                 Text(detail).font(.caption).foregroundColor(Theme.textTertiary)
