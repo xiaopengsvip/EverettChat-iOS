@@ -34,8 +34,9 @@ enum Theme {
     // Background layers — 系统分组背景（原生质感）
     static var bg: Color { Color(.systemGroupedBackground) }
     static var bgAlt: Color { Color(.secondarySystemGroupedBackground) }
-    static var surface: Color { AppTheme.current.isDark ? Color(hex: 0x111114) : Color(hex: 0xFFFFFF) }
-    static var surfaceHigh: Color { AppTheme.current.isDark ? Color(hex: 0x16161A) : Color(hex: 0xFAFAF9) }
+    // Card surface — 系统次分组背景（自适应深浅色）
+    static var surface: Color { Color(.secondarySystemGroupedBackground) }
+    static var surfaceHigh: Color { Color(.tertiarySystemFill) }
     static var surfaceAlt: Color { AppTheme.current.isDark ? Color(hex: 0x1B1B20) : Color(hex: 0xF4F4F2) }
     static var elevated: Color { AppTheme.current.isDark ? Color(hex: 0x1B1B20) : Color(hex: 0xFFFFFF) }
     static var glass: Color {
@@ -54,9 +55,9 @@ enum Theme {
     static var warning: Color { AppTheme.current.isDark ? Color(hex: 0xF5B84B) : Color(hex: 0xFF9F0A) }
     static var info: Color { AppTheme.current.isDark ? Color(hex: 0x6D9DF5) : Color(hex: 0x007AFF) }
 
-    // Outlines
-    static var outline: Color { AppTheme.current.isDark ? Color(hex: 0x1AFFFFFF) : Color(hex: 0x14000000) }
-    static var outlineStrong: Color { AppTheme.current.isDark ? Color(hex: 0x26FFFFFF) : Color(hex: 0x26000000) }
+    // Outlines — 系统分隔线色
+    static var outline: Color { Color(.separator) }
+    static var outlineStrong: Color { Color(.opaqueSeparator) }
 
     // Bubbles
     static var bubbleMine: Color { AppTheme.current.isDark ? Color(hex: 0x7C5CF0) : Color(hex: 0x7657FF) }

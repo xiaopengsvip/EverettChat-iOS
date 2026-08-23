@@ -78,24 +78,24 @@ struct FileTransferView: View {
             }
             .listStyle(.plain)
 
-            // 底部操作栏
+            // 底部操作栏（系统按钮样式）
             HStack(spacing: 16) {
-                Button(action: { showPhotoPicker = true }) {
-                    Label("图片", systemImage: "photo").font(.caption).foregroundColor(Theme.textPrimary)
-                        .padding(.horizontal, 16).padding(.vertical, 10)
-                        .background(Theme.surfaceHigh).cornerRadius(10)
+                Button { showPhotoPicker = true } label: {
+                    Label("图片", systemImage: "photo")
                 }
-                Button(action: { showFilePicker = true }) {
-                    Label("文件", systemImage: "folder").font(.caption).foregroundColor(Theme.textPrimary)
-                        .padding(.horizontal, 16).padding(.vertical, 10)
-                        .background(Theme.surfaceHigh).cornerRadius(10)
+                .buttonStyle(.bordered)
+                .tint(Theme.primary)
+                Button { showFilePicker = true } label: {
+                    Label("文件", systemImage: "folder")
                 }
+                .buttonStyle(.bordered)
+                .tint(Theme.primary)
                 if mode != .nfc {
                     Button(action: scan) {
-                        Label("搜索设备", systemImage: "magnifyingglass").font(.caption).foregroundColor(.white)
-                            .padding(.horizontal, 16).padding(.vertical, 10)
-                            .background(Theme.primary).cornerRadius(10)
+                        Label("搜索设备", systemImage: "magnifyingglass")
                     }
+                    .buttonStyle(.borderedProminent)
+                    .tint(Theme.primary)
                 }
             }
             .padding()
