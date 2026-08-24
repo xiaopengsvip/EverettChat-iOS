@@ -9,13 +9,14 @@ struct DeveloperView: View {
     @State private var isLoading = false
 
     // 启动封面测试
-    @State private var splashDelay: Double = 5.0        // 默认 5 秒
-    @State private var showSplashTest = false            // 是否显示封面
+    @State private var splashDelay: Double = 5.0
+    @State private var showSplashTest = false
 
     // 灵动岛测试
-    @State private var isTestingIsland = false           // 是否正在测试
-    @State private var islandProgress: Double = 0        // 测试进度
+    @State private var isTestingIsland = false
+    @State private var islandProgress: Double = 0
     @State private var islandTimer: Timer?
+    @State private var islandError: String? = nil
 
     var body: some View {
         List {
@@ -72,14 +73,32 @@ struct DeveloperView: View {
                         HStack {
                             Image(systemName: "exclamationmark.triangle.fill")
                                 .foregroundColor(.orange)
-                            Text("当前设备不支持灵动岛 / Live Activity")
-                                .font(.caption)
+                            Text("实时活动未开启")
+                                .font(.subheadline)
                                 .foregroundColor(.orange)
+                        }
+                        Text("请前往 设置 → EVO → 实时活动 开启后重试")
+                            .font(.caption)
+                            .foregroundColor(Theme.textTertiary)
+                        Button("打开设置") {
+                            if let url = URL(string: UIApplication.openSettingsURLString) {
+                                UIApplication.shared.open(url)
+                            }
+                        }
+                        .font(.subheadline)
+                    }
+
+                    if let err = islandError {
+                        HStack {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundColor(.red)
+                            Text(err)
+                                .font(.caption)
+                                .foregroundColor(.red)
                         }
                     }
 
                     if isTestingIsland {
-                        // 测试中：显示进度
                         HStack(spacing: 12) {
                             ProgressView(value: islandProgress, total: 1.0)
                                 .tint(Theme.primary)
@@ -88,14 +107,11 @@ struct DeveloperView: View {
                                 .foregroundColor(Theme.textSecondary)
                                 .frame(width: 36)
                         }
-
-                        HStack {
-                            Button(role: .destructive) {
-                                stopIslandTest()
-                            } label: {
-                                Label("结束测试", systemImage: "xmark.circle.fill")
-                                    .font(.subheadline)
-                            }
+                        Button(role: .destructive) {
+                            stopIslandTest()
+                        } label: {
+                            Label("结束测试", systemImage: "xmark.circle.fill")
+                                .font(.subheadline)
                         }
                     } else {
                         Button {
@@ -104,19 +120,17 @@ struct DeveloperView: View {
                             Label("开始测试灵动岛", systemImage: "iphone.radiowaves.left.and.right")
                                 .font(.subheadline)
                         }
-                        .disabled(!EvoActivityManager.shared.isSupported)
                     }
                 }
             } header: {
                 Text("测试灵动岛")
             } footer: {
-                Text("点击「开始测试」后，灵动岛会显示 AI 任务进度动画，模拟 step 1→5 后自动结束。可在锁屏查看效果。")
+                Text("点击「开始测试」后，灵动岛会显示 AI 任务进度动画，模拟 step 1→5 后自动结束。可在锁屏或灵动岛查看效果。")
             }
 
             // MARK: - 测试启动封面
             Section {
                 VStack(alignment: .leading, spacing: 12) {
-                    // 延迟时间设置
                     HStack {
                         Text("延迟显示")
                             .font(.subheadline)
@@ -149,84 +163,62 @@ struct DeveloperView: View {
 
                     Button {
                         showSplashTest = true
-                        // 延迟后自动关闭
                         DispatchQueue.main.asyncAfter(deadline: .now() + splashDelay) {
-                            if showSplashTest { showSplashTest = false }
+                            withAnimation(.easeOut(duration: 0.3)) {
+                                showSplashTest = false
+                            }
                         }
                     } label: {
-                        Label("显示启动封面 (\(Int(splashDelay)) 秒)", systemImage: "photo.fill")
+                        Label("模拟启动封面 (\(Int(splashDelay)) 秒)", systemImage: "photo.fill")
                             .font(.subheadline)
                     }
                 }
             } header: {
                 Text("测试启动封面")
             } footer: {
-                Text("点击后全屏显示启动封面图（launch_cover），\(Int(splashDelay)) 秒后自动消失。可调延迟时间（1-15 秒），便于观察封面效果。")
+                Text("点击后全屏显示启动封面，\(Int(splashDelay)) 秒后自动淡出进入主界面，模拟真实 App 启动流程。可调延迟时间（1-15 秒）。")
             }
         }
         .navigationTitle("开发者")
         .navigationBarTitleDisplayMode(.inline)
-        // 启动封面测试 overlay
         .overlay(splashTestOverlay)
-        // 页面消失时清理定时器（避免泄漏/重复触发）
         .onDisappear {
             islandTimer?.invalidate()
             islandTimer = nil
         }
     }
 
-    // MARK: - 启动封面测试 overlay
+    // MARK: - 启动封面测试 overlay（纯净版，模拟真实启动）
     @ViewBuilder
     private var splashTestOverlay: some View {
         if showSplashTest {
             ZStack {
-                Color(red: 0.039, green: 0.039, blue: 0.071) // #0A0A12 同启动封面背景
+                Color(red: 0.039, green: 0.039, blue: 0.071) // #0A0A12
                     .ignoresSafeArea()
-
                 Image("launch_cover")
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .ignoresSafeArea()
-
-                // 右上角：倒计时 + 关闭按钮
-                VStack {
-                    HStack {
-                        Spacer()
-                        Button {
-                            showSplashTest = false
-                        } label: {
-                            Image(systemName: "xmark.circle.fill")
-                                .font(.title2)
-                                .foregroundColor(.white.opacity(0.7))
-                                .padding(16)
-                        }
-                    }
-                    Spacer()
-                }
-
-                // 底部：倒计时文字
-                VStack {
-                    Spacer()
-                    Text("启动封面 (测试) · \(Int(splashDelay)) 秒后自动消失")
-                        .font(.caption)
-                        .foregroundColor(.white.opacity(0.5))
-                        .padding(.bottom, 40)
-                }
             }
             .transition(.opacity)
+            .ignoresSafeArea()
+            .statusBarHidden(true)
         }
     }
 
     // MARK: - 灵动岛测试
 
     private func startIslandTest() {
+        islandError = nil
+        let ok = EvoActivityManager.shared.start(sessionId: "test-\(Date().timeIntervalSince1970)", peerName: "灵动岛测试")
+        guard ok else {
+            islandError = "Live Activity 启动失败，请检查设置中是否开启实时活动权限"
+            return
+        }
+
         isTestingIsland = true
         islandProgress = 0
 
-        // 启动 Live Activity（AI 任务模式）
-        EvoActivityManager.shared.start(sessionId: "test-\(Date().timeIntervalSince1970)", peerName: "灵动岛测试")
-
-        // 模拟进度：step 1~5，每 0.8 秒更新一次（工具名纯文字，无 emoji）
         let steps = [
             (status: "思考中",  tool: "分析中",  progress: 0.2),
             (status: "搜索中",  tool: "搜索中",  progress: 0.4),
@@ -239,7 +231,6 @@ struct DeveloperView: View {
         islandTimer = Timer.scheduledTimer(withTimeInterval: 0.8, repeats: true) { timer in
             guard stepIndex < steps.count else {
                 timer.invalidate()
-                // 结束测试
                 EvoActivityManager.shared.end(status: "测试完成", progress: 1.0)
                 DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
                     isTestingIsland = false

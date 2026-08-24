@@ -18,9 +18,10 @@ class EvoActivityManager {
 
     // MARK: - AI 任务模式（原有）
 
-    /// 启动 Live Activity（AI 任务开始）
-    func start(sessionId: String, peerName: String = "EVO AI") {
-        guard isSupported else { return }
+    /// 启动 Live Activity（AI 任务开始），返回是否成功
+    @discardableResult
+    func start(sessionId: String, peerName: String = "EVO AI") -> Bool {
+        guard isSupported else { return false }
         let attributes = EvoActivityAttributes(sessionId: sessionId, peerName: peerName)
         let state = EvoActivityAttributes.ContentState(status: "等待中", progress: 0)
         do {
@@ -28,8 +29,10 @@ class EvoActivityManager {
                 attributes: attributes,
                 content: .init(state: state, staleDate: nil)
             )
+            return activity != nil
         } catch {
             activity = nil
+            return false
         }
     }
 
