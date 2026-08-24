@@ -1873,6 +1873,20 @@ struct MessageListView: View {
                             }
                             .padding(.vertical, 4)
 
+                    if messages.isEmpty && !isStreaming {
+                        // AI 聊天空闲状态：显示动画头像（呼吸光晕等待输入）
+                        VStack(spacing: 12) {
+                            AnimatedAvatarView(size: 72)
+                            Text(isAI ? "和 AI 助手打个招呼吧" : "说点什么开始加密聊天")
+                                .font(.subheadline)
+                                .foregroundColor(Theme.textTertiary)
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.top, 48)
+                        .padding(.bottom, 24)
+                        .id("empty-state")
+                    }
+
                     ForEach(messages) { msg in
                         MessageBubble(
                             msg: msg,
@@ -1923,13 +1937,9 @@ struct MessageListView: View {
                     }
                     if isStreaming {
                         if streamContent.isEmpty && streamReasoning.isEmpty {
-                            // AI 思考中：显示 Lottie 加载动画（紫色圆环+光点）
+                            // AI 思考中：显示 AI 动画头像（SVG 呼吸光晕 + 轨道旋转）
                             HStack(alignment: .bottom, spacing: 8) {
-                                LivingAvatarBubble(state: .thinking, size: 32)
-                                EvoLottieView(animationName: EvoLottie.aiThinking)
-                                    .frame(width: 56, height: 56)
-                                    .padding(10)
-                                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                AnimatedAvatarView(size: 44)
                                 Spacer()
                             }
                             .padding(.horizontal, Spacing.md)
