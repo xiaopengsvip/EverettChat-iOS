@@ -1892,16 +1892,31 @@ struct MessageListView: View {
                         }
                     }
                     if isStreaming {
-                        MessageBubble(
-                            msg: ChatMessage(role: "ai", text: streamContent, reasoning: streamReasoning),
-                            isMine: false, isAI: true, deviceName: deviceName,
-                            playingVoiceId: nil,
-                            onPlayVoice: { _ in },
-                            onStopVoice: {},
-                            avatarState: .thinking,
-                            autoExpandReasoning: true
-                        )
-                        .id("streaming")
+                        if streamContent.isEmpty && streamReasoning.isEmpty {
+                            // AI 思考中：显示 Lottie 加载动画（紫色圆环+光点）
+                            HStack(alignment: .bottom, spacing: 8) {
+                                LivingAvatarBubble(state: .thinking, size: 32)
+                                EvoLottieView(animationName: EvoLottie.aiThinking)
+                                    .frame(width: 56, height: 56)
+                                    .padding(10)
+                                    .background(Theme.surface, in: RoundedRectangle(cornerRadius: 16, style: .continuous))
+                                Spacer()
+                            }
+                            .padding(.horizontal, Spacing.md)
+                            .padding(.vertical, 4)
+                            .id("streaming")
+                        } else {
+                            MessageBubble(
+                                msg: ChatMessage(role: "ai", text: streamContent, reasoning: streamReasoning),
+                                isMine: false, isAI: true, deviceName: deviceName,
+                                playingVoiceId: nil,
+                                onPlayVoice: { _ in },
+                                onStopVoice: {},
+                                avatarState: .thinking,
+                                autoExpandReasoning: true
+                            )
+                            .id("streaming")
+                        }
                     }
                 }
                 .padding(.horizontal, Spacing.md)
