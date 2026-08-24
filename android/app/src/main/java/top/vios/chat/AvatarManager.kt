@@ -1,52 +1,50 @@
 package top.vios.chat
 
-import android.content.Context
-import java.util.Random
+import android.graphics.Color
 
 /**
- * 随机头像生成器
- * 基于设备名/字符串哈希生成稳定的 emoji + 颜色组合
- * 同一设备名永远得到同一头像
+ * 首字母头像生成器（与 iOS ConversationRow 同算法）
+ * 基于名字哈希生成稳定背景色 + 首字母，无 emoji，两端一致
  */
 object AvatarManager {
 
-    private val EMOJIS = arrayOf(
-        "🦊", "🐼", "🦁", "🐯", "🐸", "🦉", "🐺", "🐨",
-        "🦄", "🐳", "🦈", "🐬", "🦋", "🐝", "🦜", "🐙",
-        "🤖", "👾", "🦖", "🐉", "🦅", "🐧", "🦭", "🐢",
-        "🐹", "🦔", "🐿️", "🦇", "🐆", "🦒", "🐘", "🦩"
+    // 稳定品牌色系（8 组，bg: 浅色底，fg: 深色字）
+    private val PALETTE = arrayOf(
+        intArrayOf(0xFFE9E4FF.toInt(), 0xFF7657FF.toInt()),  // 品牌紫
+        intArrayOf(0xFFE0F2FE.toInt(), 0xFF0369A1.toInt()),  // 天蓝
+        intArrayOf(0xFFDCFCE7.toInt(), 0xFF15803D.toInt()),  // 绿
+        intArrayOf(0xFFFFEDD5.toInt(), 0xFFC2410C.toInt()),  // 橙
+        intArrayOf(0xFFFAE8FF.toInt(), 0xFFA21CAF.toInt()),  // 紫红
+        intArrayOf(0xFFCFFAFE.toInt(), 0xFF0E7490.toInt()),  // 青
+        intArrayOf(0xFFFEE2E2.toInt(), 0xFFB91C1C.toInt()),  // 红
+        intArrayOf(0xFFECFCCB.toInt(), 0xFF4D7C0F.toInt()),  // 黄绿
     )
 
-    // 头像背景色（深色系，与 UI 匹配）
-    private val COLORS = intArrayOf(
-        0xFF7C4DFF.toInt(), 0xFF2979FF.toInt(), 0xFF00C853.toInt(), 0xFFFF6D00.toInt(),
-        0xFFE53935.toInt(), 0xFF00ACC1.toInt(), 0xFF8E24AA.toInt(), 0xFF43A047.toInt(),
-        0xFFF4511E.toInt(), 0xFF3949AB.toInt(), 0xFF00897B.toInt(), 0xFFC0CA33.toInt(),
-        0xFFD81B60.toInt(), 0xFF5E35B1.toInt(), 0xFF1E88E5.toInt(), 0xFF6D4C41.toInt()
-    )
-
-    /** 根据字符串生成稳定索引 */
-    private fun hashIndex(str: String, size: Int): Int {
+    /** 稳定哈希（与 iOS stableHash 一致） */
+    private fun stableHash(str: String): Int {
         var h = 0L
         for (c in str) {
             h = (h * 31 + c.code) % 100000
         }
-        return (h % size).toInt()
+        return h.toInt()
     }
 
-    /** 获取头像 emoji */
-    fun getEmoji(name: String): String {
-        return EMOJIS[hashIndex(name, EMOJIS.size)]
+    /** 获取首字母（取第一个非空白字符，中文取第一个字） */
+    fun getLetter(name: String): String {
+        val trimmed = name.trim()
+        if (trimmed.isEmpty()) return "?"
+        return trimmed.first().uppercase().toString()
     }
 
-    /** 获取头像背景色 ARGB */
-    fun getColor(name: String): Int {
-        return COLORS[hashIndex(name, COLORS.size)]
+    /** 获取背景色（ARGB） */
+    fun getBackgroundColor(name: String): Int {
+        val idx = stableHash(name) % PALETTE.size
+        return PALETTE[idx][0]
     }
 
-    /** 获取头像背景色（带透明度） */
-    fun getColorWithAlpha(name: String, alpha: Int = 26): Int {
-        val base = getColor(name)
-        return (alpha shl 24) or (base and 0xFFFFFF)
+    /** 获取前景色（文字颜色，ARGB） */
+    fun getForegroundColor(name: String): Int {
+        val idx = stableHash(name) % PALETTE.size
+        return PALETTE[idx][1]
     }
 }

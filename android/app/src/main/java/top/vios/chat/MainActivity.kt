@@ -5681,7 +5681,7 @@ fun ChatBubble(
                             var showReasoning by remember { mutableStateOf(false) }
                             Column(Modifier.fillMaxWidth()) {
                                 Text(
-                                    text = if (msg.text.isEmpty()) "Thinking…"
+                                    text = if (msg.text.isEmpty()) "思考过程"
                                     else "思考过程 ${if (showReasoning) "▾" else "▸"}",
                                     color = AppColors.textTertiary,
                                     fontSize = 11.sp,
@@ -5730,6 +5730,13 @@ fun ChatBubble(
                                 Spacer(Modifier.height(4.dp))
                             }
                             // AI 消息：Document Style 富文本渲染（Markdown/代码/表格/列表）
+                            // AI 生成中 → 显示 Lottie 思考动画
+                            if (isAi && msg.text.isEmpty()) {
+                                top.vios.chat.ui.EvoLottieView(
+                                    rawResId = top.vios.chat.R.raw.ai_thinking,
+                                    modifier = Modifier.size(48.dp)
+                                )
+                            }
                             if (msg.text.isNotEmpty()) {
                                 RichMessageContent(text = msg.text, baseColor = fgColor)
                             }
@@ -5852,11 +5859,12 @@ fun FileRow(file: UiFile, fgColor: Color, onClick: () -> Unit) {
     }
 }
 
-/** 圆形头像（随机 emoji + 颜色） */
+/** 圆形头像（首字母 + 稳定品牌色，无 emoji，与 iOS 一致） */
 @Composable
 fun AvatarCircle(name: String, size: androidx.compose.ui.unit.Dp, modifier: Modifier = Modifier) {
-    val emoji = AvatarManager.getEmoji(name)
-    val bgColor = AvatarManager.getColor(name)
+    val letter = AvatarManager.getLetter(name)
+    val bgColor = AvatarManager.getBackgroundColor(name)
+    val fgColor = AvatarManager.getForegroundColor(name)
     Box(
         modifier = modifier
             .size(size)
@@ -5864,7 +5872,8 @@ fun AvatarCircle(name: String, size: androidx.compose.ui.unit.Dp, modifier: Modi
             .clip(CircleShape),
         contentAlignment = Alignment.Center
     ) {
-        Text(emoji, fontSize = (size.value * 0.5).sp)
+        Text(letter, fontSize = (size.value * 0.45).sp, fontWeight = androidx.compose.ui.text.font.FontWeight.SemiBold,
+            color = Color(fgColor))
     }
 }
 

@@ -93,6 +93,9 @@ dependencies {
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
     // PQC 后量子加密：ML-KEM-768（NIST FIPS 203，BouncyCastle 1.78+）
     implementation("org.bouncycastle:bcprov-jdk18on:1.85.2")
+    // Lottie 动画（素材在 res/raw/*.json，与 iOS 同款）
+    implementation("com.airbnb.android:lottie:6.4.0")
+    implementation("androidx.appcompat:appcompat:1.7.0")
     // Android 12+ 官方 SplashScreen API（统一系统启动页与自定义封面）
     implementation("androidx.core:core-splashscreen:1.0.1")
 }
