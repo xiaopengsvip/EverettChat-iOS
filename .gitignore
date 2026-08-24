@@ -29,3 +29,6 @@ android/*.bak
 .DS_Store
 *.log
 Thumbs.db
+
+# Android release keystore（密码：Evo@2026Release，不进仓库）
+android/evo-release.keystore

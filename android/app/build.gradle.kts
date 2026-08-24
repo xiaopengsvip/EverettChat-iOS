@@ -44,9 +44,19 @@ android {
         }
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file("../evo-release.keystore")
+            storePassword = "Evo@2026Release"
+            keyAlias = "evo"
+            keyPassword = "Evo@2026Release"
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("release")
         }
     }
 
