@@ -30,7 +30,7 @@ val appVersionCode = (System.currentTimeMillis() / 10000).toInt()
 
 android {
     namespace = "top.vios.chat"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "top.vios.chat"
