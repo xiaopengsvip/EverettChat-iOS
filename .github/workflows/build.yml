@@ -52,6 +52,7 @@ jobs:
             -derivedDataPath /tmp/lottie-dt \
             BUILD_LIBRARY_FOR_DISTRIBUTION=YES \
             SKIP_INSTALL=NO \
+            IPHONEOS_DEPLOYMENT_TARGET=16.2 \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
