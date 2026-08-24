@@ -19,8 +19,9 @@ struct EvoLottieView: UIViewRepresentable {
     }
 
     func updateUIView(_ uiView: LottieAnimationView, context: Context) {
-        // 动画名变化时重新加载
-        if uiView.animation?.name != animationName {
+        // 动画名变化时重新加载（用 tag 标记当前动画名）
+        if uiView.tag != animationName.hashValue {
+            uiView.tag = animationName.hashValue
             uiView.animation = LottieAnimation.named(animationName)
             uiView.loopMode = loopMode
             uiView.play()
