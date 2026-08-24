@@ -9,12 +9,12 @@ packages:
   WebRTC:
     url: https://github.com/stasel/WebRTC
     from: "125.0.0"
-  SwiftKyber:
-    url: https://github.com/leif-ibsen/SwiftKyber
-    from: "3.1.0"
-  Lottie:
-    url: https://github.com/airbnb/lottie-ios
-    from: "4.5.0"
+  # SwiftKyber:  # 实验版暂时移除（PQC v2 未接入实际使用）
+  #   url: https://github.com/leif-ibsen/SwiftKyber
+  #   from: "3.1.0"
+  # Lottie:  # 实验版暂时移除（静态链接使 debug.dylib 达 17.5MB，爱思签不上）
+  #   url: https://github.com/airbnb/lottie-ios
+  #   from: "4.5.0"
 settings:
   base:
     SWIFT_VERSION: "5.9"
@@ -34,8 +34,8 @@ targets:
         buildPhase: resources
     dependencies:
       - package: WebRTC
-      - package: SwiftKyber
-      - package: Lottie
+      # - package: SwiftKyber
+      # - package: Lottie
     info:
       path: EverettChat/Info.plist
       properties:
