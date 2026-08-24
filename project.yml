@@ -29,6 +29,9 @@ targets:
     sources:
       - EverettChat
       - EvoWidget/EvoActivityAttributes.swift
+    resources:
+      - path: EverettChat/LottieAnimations
+        buildPhase: resources
     dependencies:
       - package: WebRTC
       - package: SwiftKyber
