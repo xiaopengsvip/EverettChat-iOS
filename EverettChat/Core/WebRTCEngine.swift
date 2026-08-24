@@ -201,6 +201,11 @@ final class WebRTCEngine: NSObject, ObservableObject {
             #endif
             localVideoTrack = factory.videoTrack(with: videoSource, trackId: "video0")
             peerConnection?.add(localVideoTrack!, streamIds: ["stream0"])
+            // 创建本地视频渲染视图（用于 CallView 画中画）
+            let renderer = RTCMTLVideoView(frame: .zero)
+            renderer.videoContentMode = .scaleAspectFill
+            localVideoTrack?.add(renderer)
+            localVideoView = renderer
         }
     }
 
