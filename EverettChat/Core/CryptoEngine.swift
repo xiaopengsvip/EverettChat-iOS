@@ -130,3 +130,4 @@ enum CryptoEngine {
 
     // v2 PQC（SwiftKyber）实验版暂时移除
     // 恢复：恢复 import SwiftKyber 并取消本注释
+}
