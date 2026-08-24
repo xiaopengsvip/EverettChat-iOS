@@ -158,8 +158,8 @@ struct ConversationRow: View {
     var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.md) {
-                // 头像（优先图片 → 首字母 → SF Symbol 兜底）+ 在线状态点
-                ZStack(alignment: .bottomTrailing) {
+                // 头像（优先图片 → 首字母 → SF Symbol 兜底），居中显示
+                ZStack {
                     Circle()
                         .fill(avatarBackground)
                     if let avatarImage {
@@ -173,7 +173,10 @@ struct ConversationRow: View {
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(ConversationRow.avatarTextColor(for: name))
                     }
-                    // 在线状态点（仅真实设备/好友显示；AI 助手等固定会话不显示）
+                }
+                .frame(width: 48, height: 48)
+                // 在线状态点（仅真实设备/好友显示；用 overlay 贴右下角，不影响头像居中）
+                .overlay(alignment: .bottomTrailing) {
                     if showStatus {
                         Circle()
                             .fill(isOnline ? Color(red: 0.20, green: 0.78, blue: 0.35) : Color.gray.opacity(0.6))
@@ -182,7 +185,6 @@ struct ConversationRow: View {
                             .offset(x: 2, y: 2)
                     }
                 }
-                .frame(width: 48, height: 48)
 
                 VStack(alignment: .leading, spacing: 3) {
                     HStack {
