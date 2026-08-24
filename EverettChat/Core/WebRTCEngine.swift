@@ -183,8 +183,7 @@ final class WebRTCEngine: NSObject, ObservableObject {
         let rtcAudio = RTCAudioSession.sharedInstance()
         rtcAudio.lockForConfiguration()
         do {
-            try rtcAudio.setCategory(.playAndRecord, with: .duckOthers, options: [.allowBluetooth, .defaultToSpeaker])
-            try rtcAudio.setMode(.voiceChat)
+            try rtcAudio.setCategory(.playAndRecord, mode: .voiceChat, options: [.allowBluetooth, .defaultToSpeaker])
             try rtcAudio.setActive(true)
         } catch {
             DiagAgent.shared.log("warn", "RTCAudioSession config failed: \(error)")
