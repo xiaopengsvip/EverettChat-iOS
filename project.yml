@@ -54,7 +54,9 @@ targets:
         NSBluetoothAlwaysUsageDescription: "用于蓝牙直连"
         NSLocalNetworkUsageDescription: "用于局域网直连设备发现"
         NSBonjourServices: ["_everett._tcp"]
-        UIBackgroundModes: [voip, audio, remote-notification]
+        # 后台模式：audio 用于后台语音通话；voip/remote-notification 需要付费证书
+        # 免费 Apple ID 签名（爱思）会因 voip 模式拒绝安装，故去掉
+        UIBackgroundModes: [audio]
         NSSupportsLiveActivities: true
         NSSupportsLiveActivitiesFrequentUpdates: true
         # ATS：允许局域网 HTTP 明文（设备互联连本机 Hermes）
