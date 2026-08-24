@@ -18,6 +18,13 @@ struct CallView: View {
                 LivingAvatarBubble(state: call.state == .ringing ? .listening : (call.state == .inCall ? .speaking : .idle), size: 100)
                     .frame(width: 100, height: 100)
 
+                // 通话连接动画（connecting 状态显示 Lottie 双环脉冲）
+                if call.state == .connecting {
+                    EvoLottieView(animationName: EvoLottie.callConnecting)
+                        .frame(width: 90, height: 90)
+                        .offset(y: -40)
+                }
+
                 // 对方名称
                 Text(call.peerName)
                     .font(.title2.weight(.semibold))

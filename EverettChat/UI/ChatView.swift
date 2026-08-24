@@ -1444,6 +1444,7 @@ struct ChatInputBar: View {
     let onCancelRecord: () -> Void
     let onSlideUpChange: (Bool) -> Void
     let onDragChange: (CGFloat) -> Void
+    @State private var sendAnimTick = false   // 发送动画展示标记
 
     var body: some View {
         HStack(spacing: Spacing.sm) {
@@ -1540,12 +1541,24 @@ struct ChatInputBar: View {
 
             // 发送（有文字时）
             if !input.isEmpty {
-                Button(action: onSend) {
-                    Image(systemName: "paperplane.fill")
-                        .font(.system(size: 18))
-                        .foregroundColor(.white)
-                        .frame(width: 44, height: 44)
-                        .background(Circle().fill(Theme.primary))
+                Button {
+                    onSend()
+                    // 发送按钮展示 Lottie 发送动画（0.6s）
+                    sendAnimTick = true
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                        sendAnimTick = false
+                    }
+                } label: {
+                    if sendAnimTick {
+                        EvoLottieView(animationName: EvoLottie.sendSuccess, loopMode: .playOnce)
+                            .frame(width: 44, height: 44)
+                    } else {
+                        Image(systemName: "paperplane.fill")
+                            .font(.system(size: 18))
+                            .foregroundColor(.white)
+                            .frame(width: 44, height: 44)
+                            .background(Circle().fill(Theme.primary))
+                    }
                 }
             }
         }
@@ -1702,10 +1715,10 @@ struct RecordingOverlay: View {
                         .fill(mode == .cancel ? Color.red : Color(hex: 0x07C160))
                         .frame(width: 220, height: 150)
 
-                    // 波形（录音动画）
-                    WaveformBars(isActive: true, color: .white)
-                        .frame(width: 180, height: 60)
-                        .padding(.bottom, 30)
+                    // 波形（录音动画 — Lottie）
+                                        EvoLottieView(animationName: EvoLottie.voiceWave)
+                                            .frame(width: 180, height: 60)
+                                            .padding(.bottom, 30)
 
                     Text(String(format: "%.0f\"", seconds))
                         .font(.caption)

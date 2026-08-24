@@ -231,7 +231,8 @@ struct WeatherCard: View {
         VStack(spacing: 8) {
             if loading {
                 HStack(spacing: 8) {
-                    ProgressView().tint(Theme.primary)
+                    EvoLottieView(animationName: EvoLottie.aiToolLoading)
+                        .frame(width: 28, height: 28)
                     Text("定位并获取天气...").font(.caption).foregroundColor(Theme.textTertiary)
                 }
             } else if !errorText.isEmpty {
@@ -387,7 +388,8 @@ struct LocationCard: View {
         VStack(spacing: 8) {
             if loading {
                 HStack(spacing: 8) {
-                    ProgressView().tint(Theme.primary)
+                    EvoLottieView(animationName: EvoLottie.aiToolLoading)
+                        .frame(width: 28, height: 28)
                     Text("正在定位...").font(.caption).foregroundColor(Theme.textTertiary)
                 }
             } else if let c = coordinate {
