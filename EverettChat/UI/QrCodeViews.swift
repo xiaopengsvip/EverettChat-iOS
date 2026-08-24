@@ -100,6 +100,9 @@ struct QrScannerView: View {
     @State private var pickerItem: PhotosPickerItem?
     @State private var scanLineOffset: CGFloat = -110
     @State private var showMyQr = false
+
+    /// 四角坐标（L 型角标定位用）
+    private let corners = [(x: -1, y: -1), (x: 1, y: -1), (x: -1, y: 1), (x: 1, y: 1)]
     @State private var torchOn = false
     @State private var lowLight = false
 
@@ -131,12 +134,9 @@ struct QrScannerView: View {
                             scanLineOffset = 110
                         }
                     }
-                // 四角标记
-                ForEach([(x: -1, y: -1), (x: 1, y: -1), (x: -1, y: 1), (x: 1, y: 1)], id: \.x) { corner in
-                    RoundedRectangle(cornerRadius: 6)
-                        .stroke(Theme.primary, lineWidth: 4)
-                        .frame(width: 26, height: 26)
-                        .offset(x: CGFloat(corner.x) * 130, y: CGFloat(corner.y) * 130)
+                // 四角标记（L 型角标，id 用索引避免重复渲染）
+                ForEach(Array(corners.enumerated()), id: \.offset) { _, corner in
+                    CornerMark(corner: corner, color: Theme.primary)
                 }
             }
 
@@ -356,5 +356,29 @@ final class CameraViewController: UIViewController, AVCaptureMetadataOutputObjec
               let value = obj.stringValue else { return }
         isScanning = false
         onDetect?(value)
+    }
+}
+
+/// 扫描框四角 L 型标记（用 Path 绘制，避免小方块重叠的视觉 bug）
+struct CornerMark: View {
+    let corner: (x: Int, y: Int)
+    let color: Color
+    var length: CGFloat = 22
+    var thickness: CGFloat = 4
+
+    var body: some View {
+        Path { path in
+            let hStartX: CGFloat = corner.x == -1 ? 0 : -length
+            let hStartY: CGFloat = corner.y == -1 ? 0 : -length
+            // 水平线（从角点向外延伸）
+            path.move(to: CGPoint(x: hStartX, y: hStartY))
+            path.addLine(to: CGPoint(x: corner.x == -1 ? length : 0, y: hStartY))
+            // 垂直线（从角点向下/上延伸）
+            path.move(to: CGPoint(x: hStartX, y: hStartY))
+            path.addLine(to: CGPoint(x: hStartX, y: corner.y == -1 ? length : 0))
+        }
+        .stroke(color, style: StrokeStyle(lineWidth: thickness, lineCap: .round))
+        .frame(width: length, height: length)
+        .offset(x: CGFloat(corner.x) * 130, y: CGFloat(corner.y) * 130)
     }
 }
