@@ -45,7 +45,9 @@ struct MessagesView: View {
                     name: "Hermes 设备",
                     subtitle: deviceStore.lastMessageText,
                     time: deviceStore.messages.isEmpty ? "" : Self.formatTime(deviceStore.lastMessageTime),
-                    accent: false
+                    accent: false,
+                    showStatus: true,
+                    isOnline: appState.conn.isConnected
                 ) {
                     appState.openDeviceChat()
                 }
@@ -87,6 +89,7 @@ struct MessagesView: View {
                             time: Self.formatTime(conv.lastTime),
                             unread: conv.unread,
                                                         avatarImage: ProfileStore.shared.friendAvatar(conv.id),
+                                                        showStatus: true,
                                                         isOnline: appState.onlineDeviceIds.contains(conv.id),
                         ) {
                             appState.openPeerChat(name: conv.name, peerId: conv.id)
@@ -142,6 +145,7 @@ struct ConversationRow: View {
     var unread: Int = 0
     var accent: Bool = false
     var avatarImage: UIImage? = nil
+    var showStatus: Bool = false     // 是否显示在线状态点（仅真实设备/好友）
     var isOnline: Bool = false
     let action: () -> Void
 
@@ -169,12 +173,14 @@ struct ConversationRow: View {
                             .font(.system(size: 20, weight: .semibold))
                             .foregroundColor(ConversationRow.avatarTextColor(for: name))
                     }
-                    // 在线状态点（绿=在线，灰=离线）
-                    Circle()
-                        .fill(isOnline ? Color(red: 0.20, green: 0.78, blue: 0.35) : Color.gray.opacity(0.6))
-                        .frame(width: 13, height: 13)
-                        .overlay(Circle().stroke(Theme.bg, lineWidth: 2))
-                        .offset(x: 2, y: 2)
+                    // 在线状态点（仅真实设备/好友显示；AI 助手等固定会话不显示）
+                    if showStatus {
+                        Circle()
+                            .fill(isOnline ? Color(red: 0.20, green: 0.78, blue: 0.35) : Color.gray.opacity(0.6))
+                            .frame(width: 13, height: 13)
+                            .overlay(Circle().stroke(Theme.bg, lineWidth: 2))
+                            .offset(x: 2, y: 2)
+                    }
                 }
                 .frame(width: 48, height: 48)
 
