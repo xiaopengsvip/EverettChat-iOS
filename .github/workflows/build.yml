@@ -63,7 +63,8 @@ jobs:
             exit 1
           fi
           # 复制 Lottie.framework 到项目根目录（xcodegen 引用）
-          FRAMEWORK_PATH=$(find /tmp/lottie-dt -name "Lottie.framework" -type d | head -1)
+          # 注意：必须从 Products 目录找（EagerLinkingTBDs 里只是 .tbd 符号存根）
+          FRAMEWORK_PATH=$(find /tmp/lottie-dt/Build/Products -name "Lottie.framework" -type d | head -1)
           echo "Lottie.framework: $FRAMEWORK_PATH"
           cp -R "$FRAMEWORK_PATH" "${{ github.workspace }}/Lottie.framework"
           ls -la "${{ github.workspace }}/Lottie.framework"
