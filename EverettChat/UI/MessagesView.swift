@@ -145,13 +145,19 @@ struct ConversationRow: View {
     var isOnline: Bool = false
     let action: () -> Void
 
+    /// 首字母头像背景色（基于名字哈希的稳定品牌色系）
+    private var avatarBackground: Color {
+        if accent { return Theme.primaryDim }
+        return ConversationRow.avatarColor(for: name)
+    }
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: Spacing.md) {
-                // 头像（优先图片，其次 SF Symbol/占位）+ 在线状态点
+                // 头像（优先图片 → 首字母 → SF Symbol 兜底）+ 在线状态点
                 ZStack(alignment: .bottomTrailing) {
                     Circle()
-                        .fill(accent ? Theme.primaryDim : Theme.surfaceAlt)
+                        .fill(avatarBackground)
                     if let avatarImage {
                         Image(uiImage: avatarImage)
                             .resizable()
@@ -159,9 +165,9 @@ struct ConversationRow: View {
                             .frame(width: 48, height: 48)
                             .clipShape(Circle())
                     } else {
-                        Image(systemName: icon)
-                            .font(.system(size: 20))
-                            .foregroundColor(accent ? Theme.primary : Theme.textSecondary)
+                        Text(ConversationRow.avatarLetter(for: name))
+                            .font(.system(size: 20, weight: .semibold))
+                            .foregroundColor(ConversationRow.avatarTextColor(for: name))
                     }
                     // 在线状态点（绿=在线，灰=离线）
                     Circle()
@@ -207,5 +213,47 @@ struct ConversationRow: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+    }
+
+    // MARK: - 首字母头像（与 Android AvatarManager 同算法，稳定一致）
+
+    /// 名字首字母（取第一个非空白字符，中文取第一个字）
+    static func avatarLetter(for name: String) -> String {
+        let trimmed = name.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let first = trimmed.first else { return "?" }
+        return String(first).uppercased()
+    }
+
+    /// 稳定品牌色系（基于名字哈希，同名字永远同色）
+    private static let avatarPalette: [(bg: Color, fg: Color)] = [
+        (Color(hex: 0xE9E4FF), Color(hex: 0x7657FF)),  // 品牌紫
+        (Color(hex: 0xE0F2FE), Color(hex: 0x0369A1)),  // 天蓝
+        (Color(hex: 0xDCFCE7), Color(hex: 0x15803D)),  // 绿
+        (Color(hex: 0xFFEDD5), Color(hex: 0xC2410C)),  // 橙
+        (Color(hex: 0xFAE8FF), Color(hex: 0xA21CAF)),  // 紫红
+        (Color(hex: 0xCFFAFE), Color(hex: 0x0E7490)),  // 青
+        (Color(hex: 0xFEE2E2), Color(hex: 0xB91C1C)),  // 红
+        (Color(hex: 0xECFCCB), Color(hex: 0x4D7C0F)),  // 黄绿
+    ]
+
+    /// 基于名字哈希的稳定背景色
+    static func avatarColor(for name: String) -> Color {
+        let idx = stableHash(name) % avatarPalette.count
+        return avatarPalette[idx].bg
+    }
+
+    /// 基于名字哈希的稳定前景色（首字母颜色）
+    static func avatarTextColor(for name: String) -> Color {
+        let idx = stableHash(name) % avatarPalette.count
+        return avatarPalette[idx].fg
+    }
+
+    /// 稳定字符串哈希（与 Android hashIndex 思路一致）
+    private static func stableHash(_ str: String) -> Int {
+        var h: Int64 = 0
+        for c in str.unicodeScalars {
+            h = (h * 31 + Int64(c.value)) % 100000
+        }
+        return Int(h)
     }
 }
