@@ -23,35 +23,23 @@ class CallManager(
         private const val TAG = "CallManager"
         const val CALL_TIMEOUT_MS = 60_000L   // 60 秒未接通自动挂断
 
-        // TURN 服务器配置（REST 凭据，可通过设置页配置；未配置时回退纯 STUN）
-        // 部署 coturn 后填写：turn:your-server:3478 + 短期凭据
-        private const val TURN_URL = ""          // 例: "turn:turn.vios.top:3478?transport=udp"
-        private const val TURN_URL_TCP = ""      // 例: "turn:turn.vios.top:3478?transport=tcp"
-        private const val TURN_URL_TLS = ""      // 例: "turns:turn.vios.top:443?transport=tcp"
-        private const val TURN_USERNAME = ""
-        private const val TURN_PASSWORD = ""
-
-        /** 组装 ICE Servers：STUN + 可选 TURN（UDP/TCP/TLS 全路径） */
+        /** 组装 ICE Servers：STUN + 动态 TURN（relay /turn/credentials 获取 Cloudflare 凭据） */
         fun buildIceServers(): List<PeerConnection.IceServer> {
             val servers = mutableListOf(
-                PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer()
+                PeerConnection.IceServer.builder("stun:stun.l.google.com:19302").createIceServer(),
+                PeerConnection.IceServer.builder("stun:stun1.l.google.com:19302").createIceServer()
             )
-            if (TURN_URL.isNotBlank() && TURN_USERNAME.isNotBlank()) {
-                servers += PeerConnection.IceServer.builder(TURN_URL)
-                    .setUsername(TURN_USERNAME).setPassword(TURN_PASSWORD).createIceServer()
-                if (TURN_URL_TCP.isNotBlank()) {
-                    servers += PeerConnection.IceServer.builder(TURN_URL_TCP)
-                        .setUsername(TURN_USERNAME).setPassword(TURN_PASSWORD).createIceServer()
-                }
-                if (TURN_URL_TLS.isNotBlank()) {
-                    servers += PeerConnection.IceServer.builder(TURN_URL_TLS)
-                        .setUsername(TURN_USERNAME).setPassword(TURN_PASSWORD).createIceServer()
+            // 动态 TURN 凭据（Cloudflare Calls，1h 有效；未获取到时纯 STUN 兜底）
+            TurnCredentialsHolder.current()?.let { creds ->
+                creds.urls.forEach { url ->
+                    servers += PeerConnection.IceServer.builder(url)
+                        .setUsername(creds.username).setPassword(creds.credential).createIceServer()
                 }
             }
             return servers
         }
 
-        // 信令消息类型（走 Transport.sendText 的 JSON 包装）
+        // 信令消息类型（走 Transport.sendText 的 __call_signal__ 包装）
         const val TYPE_CALL_OFFER = "call-offer"
         const val TYPE_CALL_ANSWER = "call-answer"
         const val TYPE_CALL_ICE = "call-ice"
@@ -59,6 +47,47 @@ class CallManager(
         const val TYPE_CALL_HANGUP = "call-hangup"
         const val TYPE_CALL_BUSY = "call-busy"
     }
+
+    /** TURN 凭据缓存（静态，异步刷新） */
+    object TurnCredentialsHolder {
+        private var urls: List<String> = emptyList()
+        private var username = ""
+        private var credential = ""
+
+        fun current(): TurnCreds? =
+            if (urls.isNotEmpty() && username.isNotEmpty() && credential.isNotEmpty())
+                TurnCreds(urls, username, credential)
+            else null
+
+        /** 从 relay 获取 Cloudflare TURN 凭据（与 iOS WebRTCEngine 同端点） */
+        fun refresh(httpBaseUrl: String) {
+            try {
+                val url = java.net.URI("$httpBaseUrl/turn/credentials?ttl=3600").toURL()
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.setRequestProperty("User-Agent", "Mozilla/5.0")
+                conn.connectTimeout = 15000
+                conn.readTimeout = 15000
+                val resp = conn.inputStream.bufferedReader().readText()
+                val json = org.json.JSONObject(resp)
+                val ice = json.optJSONObject("iceServers") ?: return
+                val urlArr = ice.optJSONArray("urls") ?: return
+                val newUrls = (0 until urlArr.length()).map { urlArr.getString(it) }
+                val user = ice.optString("username", "")
+                val pass = ice.optString("credential", "")
+                if (newUrls.isNotEmpty() && user.isNotEmpty() && pass.isNotEmpty()) {
+                    urls = newUrls
+                    username = user
+                    credential = pass
+                    top.vios.chat.DevLog.i("Call", "TURN 凭据已刷新 (${newUrls.size} urls)")
+                }
+            } catch (e: Exception) {
+                top.vios.chat.DevLog.i("Call", "TURN 刷新失败: ${e.message}")
+            }
+        }
+    }
+
+    data class TurnCreds(val urls: List<String>, val username: String, val credential: String)
 
     interface CallListener {
         fun onIncomingCall(callId: String, from: String, video: Boolean)

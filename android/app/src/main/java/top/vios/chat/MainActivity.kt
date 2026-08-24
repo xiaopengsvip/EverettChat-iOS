@@ -28,6 +28,7 @@ import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.ui.res.painterResource
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
@@ -1315,6 +1316,10 @@ fun AppRoot() {
                                 val t = transport
                                 if (t != null && t.isConnected()) {
                                     callSummary = ""
+                                    // 刷新 Cloudflare TURN 凭据（跨网互拨必需，与 iOS 同端点）
+                                    top.vios.chat.call.CallManager.TurnCredentialsHolder.refresh(
+                                        if (relayHttp.isNotBlank()) relayHttp.trimEnd('/') else "https://relay.vios.top"
+                                    )
                                     val cm = CallManager(context, t, deviceName)
                                     callManager = cm
                                     callIsVideo = video
@@ -2081,6 +2086,7 @@ fun MessagesScreen(
                     },
                     timeText = if (aiLastText.isNotEmpty()) "现在" else "",
                     accent = true,
+                    avatarImage = R.drawable.ai_avatar,
                     onClick = { onOpenConversation(Conversation(id = "ai", name = "AI 助手", type = "ai", lastText = "", lastTime = 0)) }
                 )
             }
@@ -2137,6 +2143,7 @@ fun ModernConvRow(
     timeText: String,
     unread: Int = 0,
     accent: Boolean = false,   // AI 助手等主要会话：标题用强调色
+    avatarImage: Any? = null,  // AI 助手默认头像（DrawableRes 或 Painter）
     onClick: () -> Unit
 ) {
     Surface(
@@ -2149,7 +2156,24 @@ fun ModernConvRow(
             modifier = Modifier.padding(horizontal = AppSpacing.lg, vertical = AppSpacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            AvatarCircle(name = avatarName, size = 48.dp)
+            if (avatarImage != null) {
+                // AI 助手图片头像（圆形裁切）
+                Box(
+                    modifier = Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .background(AppColors.surfaceAlt)
+                ) {
+                    Image(
+                        painter = painterResource(id = avatarImage as Int),
+                        contentDescription = null,
+                        contentScale = ContentScale.Crop,
+                        modifier = Modifier.fillMaxSize()
+                    )
+                }
+            } else {
+                AvatarCircle(name = avatarName, size = 48.dp)
+            }
             Spacer(Modifier.width(AppSpacing.md))
             Column(Modifier.weight(1f)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
