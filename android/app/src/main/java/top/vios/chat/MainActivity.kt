@@ -765,14 +765,22 @@ fun AppRoot() {
                                 }
                             } catch (_: Exception) {}
                             // 调试模式开启时，把命令记录到"EVO 调试通道"会话
-                            if (debugMode) {
-                                val dbgMsg = UiMessage(
-                                    id = "dbg-" + System.currentTimeMillis(), role = "peer",
-                                    text = text, senderName = "调试通道", senderId = "cmd-server"
-                                )
-                                if (activeConv?.id == "cmd-server") messages.add(dbgMsg)
-                                updateConversation("debug", "cmd-server", "EVO 调试通道", text)
-                            }
+                                                        if (debugMode) {
+                                                            val dbgMsg = UiMessage(
+                                                                id = "dbg-" + System.currentTimeMillis(), role = "peer",
+                                                                text = text, senderName = "调试通道", senderId = "cmd-server"
+                                                            )
+                                                            // 加入当前消息列表（如果正在查看调试通道）
+                                                            if (activeConv?.id == "cmd-server") messages.add(dbgMsg)
+                                                            // 持久化到本地 DB（确保打开调试通道能加载历史）
+                                                            try {
+                                                                msgStore.insertMessage(
+                                                                    id = dbgMsg.id, convId = "cmd-server", role = "peer",
+                                                                    text = text, senderName = "调试通道", senderId = "cmd-server"
+                                                                )
+                                                            } catch (_: Exception) {}
+                                                            updateConversation("debug", "cmd-server", "EVO 调试通道", text)
+                                                        }
                             return@launch   // 调试命令不进入消息列表（泄漏修复）
                         }
                         // 通话信令 → 分发
@@ -1258,7 +1266,7 @@ fun AppRoot() {
                     val conv = activeConv
                     if (conv != null) {
                         // 对话隔离：切换 peer 会话时从本地 DB 加载该会话历史（不混入其他会话）
-                        if (conv.type == "peer") {
+                        if (conv.type == "peer" || conv.type == "debug") {
                             LaunchedEffect(conv.id) {
                                 try {
                                     val hist = msgStore.loadMessages(conv.id, 200)

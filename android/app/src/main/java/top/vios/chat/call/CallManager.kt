@@ -120,6 +120,26 @@ class CallManager(
     private var cameraCapturer: org.webrtc.CameraVideoCapturer? = null
     private var surfaceTextureHelper: org.webrtc.SurfaceTextureHelper? = null
 
+    private var savedAudioMode: Int? = null  // 通话前的音频模式，结束后恢复
+
+    // 音频管理：通话时设为 MODE_IN_COMMUNICATION，结束后恢复
+    private fun enableAudioMode() {
+        try {
+            val am = context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+            savedAudioMode = am.mode
+            am.mode = android.media.AudioManager.MODE_IN_COMMUNICATION
+            am.isSpeakerphoneOn = true
+        } catch (_: Exception) {}
+    }
+    private fun disableAudioMode() {
+        try {
+            val am = context.getSystemService(android.content.Context.AUDIO_SERVICE) as android.media.AudioManager
+            savedAudioMode?.let { am.mode = it }
+            savedAudioMode = null
+            am.isSpeakerphoneOn = false
+        } catch (_: Exception) {}
+    }
+
     init {
         initWebRTC()
     }
@@ -244,6 +264,7 @@ class CallManager(
         currentCallId = UUID.randomUUID().toString()
         callStartMs = System.currentTimeMillis()
         connectedMs = 0L
+        enableAudioMode()
         createPeerConnection()
 
         // 60 秒未接通自动挂断（主叫方）
@@ -334,6 +355,7 @@ class CallManager(
             listener?.onCallError("未收到对方通话数据，请让对方重新拨打")
             return
         }
+        enableAudioMode()
         createPeerConnection()
         val pc = peerConnection
         if (pc == null) {
@@ -559,12 +581,13 @@ class CallManager(
             })
         } catch (_: Exception) {}
         cleanupPeerConnection()
+        disableAudioMode()
         listener?.onCallEnded(callId ?: "", reason, summary)
     }
 
-    /** 生成通话结束摘要（如 "📞 语音通话 00:32" / "📞 未接听"） */
+    /** 生成通话结束摘要 */
     fun buildSummary(reason: String): String {
-        val kind = if (isVideoCall) "📹 视频通话" else "📞 语音通话"
+        val kind = if (isVideoCall) "[视频通话]" else "[语音通话]"
         if (connectedMs > 0) {
             val secs = ((System.currentTimeMillis() - connectedMs) / 1000).coerceAtLeast(0)
             val mm = secs / 60
@@ -572,10 +595,10 @@ class CallManager(
             return String.format(Locale.CHINA, "%s %02d:%02d", kind, mm, ss)
         }
         return when {
-            reason.contains("拒绝") || reason.contains("正忙") -> "📵 对方已拒绝"
-            reason.contains("超时") || reason.contains("未接听") || reason.contains("未接") -> "📵 未接听"
-            reason.contains("中断") || reason.contains("失败") -> "⚠️ 通话中断"
-            else -> "📵 已取消"
+            reason.contains("拒绝") || reason.contains("正忙") -> "对方已拒绝"
+            reason.contains("超时") || reason.contains("未接听") || reason.contains("未接") -> "未接听"
+            reason.contains("中断") || reason.contains("失败") -> "通话中断"
+            else -> "已取消"
         }
     }
 
