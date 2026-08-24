@@ -13,6 +13,12 @@ struct EvoLottieView: View {
     }
 }
 
+/// Lottie 循环模式占位（实验版）
+enum EvoLottieLoopMode {
+    static let playOnce = 0
+    static let infinite = 1
+}
+
 enum EvoLottie {
     static let aiAvatar = ""
     static let aiThinking = ""

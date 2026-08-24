@@ -1550,8 +1550,8 @@ struct ChatInputBar: View {
                     }
                 } label: {
                     if sendAnimTick {
-                        EvoLottieView(animationName: EvoLottie.sendSuccess, loopMode: .playOnce)
-                            .frame(width: 44, height: 44)
+                        EvoLottieView(animationName: EvoLottie.sendSuccess)
+                                                    .frame(width: 44, height: 44)
                     } else {
                         Image(systemName: "paperplane.fill")
                             .font(.system(size: 18))
