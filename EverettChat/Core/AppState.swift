@@ -252,7 +252,16 @@ final class AppState: ObservableObject {
         let debugId = "cmd-server"
         let msg = ChatMessage(role: "peer", text: text, senderName: "调试通道", senderId: debugId)
         peerMessages.append(msg)
-        updatePeerConversation(senderId: debugId, name: "EVO 调试通道", lastText: text, time: msg.createdAt)
+        // 专门更新调试通道会话（保持 type="debug"，不混入好友会话区）
+        if let index = conversations.firstIndex(where: { $0.id == debugId }) {
+            conversations[index].lastText = text
+            conversations[index].lastTime = Date()
+        } else {
+            conversations.append(
+                Conversation(id: debugId, name: "EVO 调试通道", type: "debug",
+                             lastText: text, lastTime: Date())
+            )
+        }
         syncDebugChannel()
     }
 
