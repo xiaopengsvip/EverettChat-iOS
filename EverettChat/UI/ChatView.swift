@@ -1937,9 +1937,9 @@ struct MessageListView: View {
                     }
                     if isStreaming {
                         if streamContent.isEmpty && streamReasoning.isEmpty {
-                            // AI 思考中：显示 AI 动画头像（SVG 呼吸光晕 + 轨道旋转）
+                            // AI 思考中：声波扩散 + 呼吸光圈动画
                             HStack(alignment: .bottom, spacing: 8) {
-                                AnimatedAvatarView(size: 44)
+                                AnimatedAvatarView(size: 44, mode: .thinking)
                                 Spacer()
                             }
                             .padding(.horizontal, Spacing.md)
