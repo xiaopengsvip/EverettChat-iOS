@@ -8,7 +8,7 @@ enum CallType {
     case video   // 视频通话
 }
 
-/// 通话状态机（Evo Protocol CALL_* 信令）
+/// 通话状态机（Evo Protocol CALL_* 信令，与 Android 一致）
 enum CallState: Equatable {
     case idle          // 空闲
     case outgoing      // 去电（等待对方接听）
@@ -29,8 +29,7 @@ enum CallState: Equatable {
     }
 }
 
-/// 统一通话管理器（P2：WebRTC 音视频）
-/// 信令走 ConnectionManager（Cloud WS），媒体通道后续接 WebRTC
+/// 统一通话管理器（WebRTC 音视频，信令走 __call_signal__ 协议，与 Android 互通）
 @MainActor
 final class CallManager: ObservableObject {
     static let shared = CallManager()
@@ -46,45 +45,70 @@ final class CallManager: ObservableObject {
 
     private var conn: ConnectionManager { ConnectionManager.shared }
     private var timer: Timer?
-    private var callbacks: [String: (String, String, String, [String: Any]) -> Void] = [:]
     private var activeCallUUID: UUID?
 
     private init() {
-        // 订阅统一连接层的消息（多播，不覆盖 AppState）
+        // WebRTC 引擎收到 offer → 弹来电 UI
+        WebRTCEngine.shared.onIncomingOffer = { [weak self] callId, from, video in
+            self?.handleIncomingOffer(callId: callId, from: from, video: video)
+        }
+        // 订阅统一连接层的消息（__call_signal__ 信令 + 状态类）
         conn.addMessageHandler { [weak self] type, from, senderId, payload in
             self?.handleSignal(type: type, from: from, senderId: senderId, payload: payload)
         }
     }
 
-    // MARK: - 信令处理
+    // MARK: - 信令处理（__call_signal__ 协议）
 
     private func handleSignal(type: String, from: String, senderId: String, payload: [String: Any]) {
-        switch type {
-        case "call-start":
-            guard let callTypeRaw = payload["callType"] as? String else { return }
-            state = .ringing
-            callType = callTypeRaw == "video" ? .video : .audio
-            peerName = from
-            peerId = senderId
-            callbacks[peerId] = { [weak self] t, f, sid, p in self?.handleSignal(type: t, from: f, senderId: sid, payload: p) }
-            // CallKit 系统来电界面（锁屏/后台显示）
-            CallKitAdapter.shared.reportIncomingCall(uuid: UUID(), peerName: from, hasVideo: callType == .video)
-            // 本地通知补充（无 CallKit 权限时）
-            PushRegistration.shared.showLocalNotification(title: "\(from) 来电", body: callType == .video ? "视频通话" : "语音通话")
-        case "call-accept":
+        // 解析 __call_signal__ 包装
+        guard type == "text",
+              let content = payload["content"] as? String,
+              let outer = try? JSONSerialization.jsonObject(with: Data(content.utf8)) as? [String: Any],
+              outer["__call_signal__"] as? Bool == true,
+              let dataStr = outer["data"] as? String,
+              let data = try? JSONSerialization.jsonObject(with: Data(dataStr.utf8)) as? [String: Any],
+              let signalType = data["type"] as? String else { return }
+
+        let cid = data["callId"] as? String ?? ""
+        switch signalType {
+        case "call-offer":
+            // WebRTCEngine 已通过 onIncomingOffer 通知，这里只做状态兜底
+            break
+        case "call-answer":
             if state == .outgoing {
                 state = .connecting
                 startTimer()
             }
-        case "call-reject":
-            if state == .outgoing || state == .ringing {
-                endCall()
-            }
-        case "call-end":
+        case "call-hangup":
+            // 对方挂断
+            endCall()
+        case "call-busy":
+            // 对方正忙/拒绝
+            endCall()
+        case "call-ended":
             endCall()
         default:
             break
         }
+    }
+
+    /// 收到来电 offer（WebRTCEngine 回调）
+    private func handleIncomingOffer(callId: String, from: String, video: Bool) {
+        guard state == .idle else {
+            // 忙：回 call-busy
+            sendSignal(type: "call-busy", callId: callId)
+            return
+        }
+        state = .ringing
+        callType = video ? .video : .audio
+        peerName = from
+        // CallKit 系统来电界面（锁屏/后台显示）
+        let uuid = UUID()
+        activeCallUUID = uuid
+        CallKitAdapter.shared.reportIncomingCall(uuid: uuid, peerName: from, hasVideo: video)
+        // 本地通知补充
+        PushRegistration.shared.showLocalNotification(title: "\(from) 来电", body: video ? "视频通话" : "语音通话")
     }
 
     // MARK: - 对外接口
@@ -97,14 +121,11 @@ final class CallManager: ObservableObject {
         self.state = .outgoing
         // 刷新 TURN 凭据（Cloudflare Calls 动态凭据）
         WebRTCEngine.shared.refreshTurnCredentials()
-        conn.send(type: "call-start", target: peerId, payload: [
-            "callType": type == .video ? "video" : "audio",
-            "target": peerId
-        ])
-        // 启动 WebRTC 引擎（发起 Offer）
-        WebRTCEngine.shared.startCall(type: type)
+        // 启动 WebRTC 引擎（创建 PeerConnection + 生成 Offer 并发送 call-offer）
+        WebRTCEngine.shared.startCall(type: type, peerId: peerId)
         // 启动音频会话（听筒/扬声器路由）
         CallKitAdapter.shared.startAudioSession()
+        startTimer()
         // 超时挂断（60s 未接听）
         DispatchQueue.main.asyncAfter(deadline: .now() + 60) { [weak self] in
             if self?.state == .outgoing {
@@ -117,10 +138,9 @@ final class CallManager: ObservableObject {
     func acceptCall() {
         guard state == .ringing else { return }
         state = .connecting
-        // 刷新 TURN 凭据（Cloudflare Calls 动态凭据）
+        // 刷新 TURN 凭据
         WebRTCEngine.shared.refreshTurnCredentials()
-        conn.send(type: "call-accept", target: peerId, payload: ["target": peerId])
-        // 启动 WebRTC 引擎（应答 Offer）
+        // WebRTC 引擎：setRemoteDescription(offer) + 生成 Answer 并发送
         WebRTCEngine.shared.acceptCall(type: callType)
         startTimer()
     }
@@ -128,14 +148,14 @@ final class CallManager: ObservableObject {
     /// 拒绝来电
     func rejectCall() {
         guard state == .ringing else { return }
-        conn.send(type: "call-reject", target: peerId, payload: ["target": peerId])
+        sendSignal(type: "call-busy")
         endCall()
     }
 
     /// 挂断
     func endCall() {
         if state != .idle && state != .ended {
-            conn.send(type: "call-end", target: peerId, payload: ["target": peerId])
+            sendSignal(type: "call-hangup")
         }
         // 关闭 WebRTC 引擎
         WebRTCEngine.shared.endCall()
@@ -159,10 +179,25 @@ final class CallManager: ObservableObject {
 
     func toggleSpeaker() {
         isSpeakerOn.toggle()
+        CallKitAdapter.shared.setSpeaker(isSpeakerOn)
     }
 
     func toggleVideo() {
         isVideoEnabled.toggle()
+    }
+
+    // MARK: - 信令发送
+
+    /// 发送 __call_signal__ 包装信令（与 Android RelayTransport.sendText 格式一致）
+    private func sendSignal(type: String, callId: String = "") {
+        let cid = callId.isEmpty ? UUID().uuidString : callId
+        let inner: [String: Any] = ["type": type, "callId": cid, "from": DeviceIdentity.shared.deviceName]
+        guard let innerData = try? JSONSerialization.data(withJSONObject: inner),
+              let innerStr = String(data: innerData, encoding: .utf8) else { return }
+        let outer: [String: Any] = ["__call_signal__": true, "data": innerStr]
+        guard let outerData = try? JSONSerialization.data(withJSONObject: outer),
+              let outerStr = String(data: outerData, encoding: .utf8) else { return }
+        conn.sendText(outerStr, target: peerId)
     }
 
     // MARK: - 计时

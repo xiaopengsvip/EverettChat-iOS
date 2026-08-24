@@ -3,7 +3,9 @@ import WebRTC
 import Combine
 
 /// WebRTC 媒体引擎：真实音视频通道
-/// 信令经 ConnectionManager 交换（call-offer / call-answer / call-ice）
+/// 信令走 ConnectionManager 的 __call_signal__ 包装（与 Android 一致，实现 iOS↔Android 互拨）
+/// - call-offer（含 sdp/video/from/callId）→ call-answer（sdp）→ call-ice（candidate）
+/// - call-hangup / call-busy / call-ended 由 CallManager 处理
 @MainActor
 final class WebRTCEngine: NSObject, ObservableObject {
     static let shared = WebRTCEngine()
@@ -12,14 +14,19 @@ final class WebRTCEngine: NSObject, ObservableObject {
     @Published var localVideoView: RTCMTLVideoView?
     @Published var remoteVideoView: RTCMTLVideoView?
 
+    // 收到来电 offer 的回调（CallManager 弹来电 UI，不自动接听）
+    var onIncomingOffer: ((String, String, Bool) -> Void)?   // (callId, from, video)
+
     private var factory: RTCPeerConnectionFactory!
     private var peerConnection: RTCPeerConnection?
     private var localVideoTrack: RTCVideoTrack?
     private var localAudioTrack: RTCAudioTrack?
     private var remoteVideoTrack: RTCVideoTrack?
     private var callId = ""
-    private var conn: ConnectionManager { ConnectionManager.shared }
     private var videoEnabled = false
+    private var pendingOfferSdp: String? = nil
+    private var conn: ConnectionManager { ConnectionManager.shared }
+    private var pendingCandidates: [RTCIceCandidate] = []
 
     // STUN（公共）+ TURN（relay 动态获取 Cloudflare Calls 凭据）
     private var staticIceServers: [RTCIceServer] {
@@ -61,44 +68,73 @@ final class WebRTCEngine: NSObject, ObservableObject {
         let encoderFactory = RTCDefaultVideoEncoderFactory()
         let decoderFactory = RTCDefaultVideoDecoderFactory()
         factory = RTCPeerConnectionFactory(encoderFactory: encoderFactory, decoderFactory: decoderFactory)
-        // 订阅信令
-        conn.addMessageHandler { [weak self] type, _, _, payload in
+        // 订阅信令（__call_signal__ 包装，外层 type=text）
+        conn.addMessageHandler { [weak self] type, from, senderId, payload in
             self?.handleSignal(type: type, payload: payload)
         }
     }
 
-    // MARK: - 信令
+    // MARK: - 信令（__call_signal__ 协议，与 Android 一致）
 
     private func handleSignal(type: String, payload: [String: Any]) {
-        switch type {
+        // 解析 __call_signal__ 包装（Android 发的：外层 text + content 为 {"__call_signal__":true,"data":"{...}"}）
+        guard type == "text",
+              let content = payload["content"] as? String,
+              let outer = try? JSONSerialization.jsonObject(with: Data(content.utf8)) as? [String: Any],
+              outer["__call_signal__"] as? Bool == true,
+              let dataStr = outer["data"] as? String,
+              let data = try? JSONSerialization.jsonObject(with: Data(dataStr.utf8)) as? [String: Any],
+              let signalType = data["type"] as? String else { return }
+
+        switch signalType {
         case "call-offer":
-            guard let sdp = payload["sdp"] as? String, let cid = payload["callId"] as? String else { return }
+            guard let sdp = data["sdp"] as? String else { return }
+            let cid = data["callId"] as? String ?? ""
+            let video = data["video"] as? Bool ?? false
+            let fromName = data["from"] as? String ?? "对端"
             callId = cid
-            receiveOffer(sdp)
+            videoEnabled = video
+            pendingOfferSdp = sdp
+            // 通知 CallManager 弹来电 UI（不自动接听）
+            onIncomingOffer?(cid, fromName, video)
         case "call-answer":
-            guard let sdp = payload["sdp"] as? String else { return }
+            guard let sdp = data["sdp"] as? String else { return }
             receiveAnswer(sdp)
         case "call-ice":
-            guard let candidate = payload["candidate"] as? String,
-                  let mid = payload["sdpMid"] as? String,
-                  let index = payload["sdpMLineIndex"] as? Int else { return }
+            guard let candidate = data["candidate"] as? String,
+                  let mid = data["sdpMid"] as? String,
+                  let index = data["sdpMLineIndex"] as? Int else { return }
             let ice = RTCIceCandidate(sdp: candidate, sdpMLineIndex: Int32(index), sdpMid: mid)
-            peerConnection?.add(ice)
+            let pc = peerConnection
+            // 被叫方在 setRemoteDescription 前收到的 ICE 先缓存
+            if pc != nil, pc?.remoteDescription != nil {
+                pc?.add(ice)
+            } else {
+                pendingCandidates.append(ice)
+            }
         default:
             break
         }
     }
 
+    /// 发送 __call_signal__ 包装信令（与 Android RelayTransport.sendText 格式一致）
     private func sendSignal(type: String, payload: [String: Any]) {
-        var p = payload
-        p["callId"] = callId
-        conn.send(type: type, target: CallManager.shared.peerId, payload: p)
+        var inner = payload
+        inner["type"] = type
+        inner["callId"] = callId
+        inner["from"] = DeviceIdentity.shared.deviceName
+        guard let innerData = try? JSONSerialization.data(withJSONObject: inner),
+              let innerStr = String(data: innerData, encoding: .utf8) else { return }
+        let outer: [String: Any] = ["__call_signal__": true, "data": innerStr]
+        guard let outerData = try? JSONSerialization.data(withJSONObject: outer),
+              let outerStr = String(data: outerData, encoding: .utf8) else { return }
+        conn.sendText(outerStr, target: CallManager.shared.peerId)
     }
 
-    // MARK: - 发起/接听
+    // MARK: - 发起/接听/挂断
 
     /// 发起通话：创建 PeerConnection + 本地轨道 + Offer
-    func startCall(type: CallType) {
+    func startCall(type: CallType, peerId: String) {
         videoEnabled = (type == .video)
         callId = UUID().uuidString
         setupPeerConnection(video: videoEnabled)
@@ -106,14 +142,26 @@ final class WebRTCEngine: NSObject, ObservableObject {
         let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: ["DtlsSrtpKeyAgreement": "true"])
         pc.offer(for: constraints) { [weak self] sdp, _ in
             guard let sdp else { return }
-            self?.setLocalAndSend(sdp, type: "call-offer")
+            self?.setLocalAndSend(sdp, type: "call-offer", extra: ["video": self?.videoEnabled ?? false])
         }
     }
 
-    /// 接听：应答 Offer
+    /// 接听：先 setRemoteDescription(offer)，再创建 Answer 发送
     func acceptCall(type: CallType) {
         videoEnabled = (type == .video)
         setupPeerConnection(video: videoEnabled)
+        guard let pc = peerConnection, let offerSdp = pendingOfferSdp else { return }
+        let sdp = RTCSessionDescription(type: .offer, sdp: offerSdp)
+        pc.setRemoteDescription(sdp) { [weak self] _ in
+            guard let self, let pc = self.peerConnection else { return }
+            // 添加缓存的远端 ICE
+            self.drainCandidates()
+            let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: ["DtlsSrtpKeyAgreement": "true"])
+            pc.answer(for: constraints) { sdp, _ in
+                guard let sdp else { return }
+                self.setLocalAndSend(sdp, type: "call-answer", extra: [:])
+            }
+        }
     }
 
     /// 挂断
@@ -121,6 +169,8 @@ final class WebRTCEngine: NSObject, ObservableObject {
         peerConnection?.close()
         peerConnection = nil
         remoteVideoTrack = nil
+        pendingCandidates.removeAll()
+        pendingOfferSdp = nil
     }
 
     private func setupPeerConnection(video: Bool) {
@@ -154,27 +204,24 @@ final class WebRTCEngine: NSObject, ObservableObject {
         }
     }
 
-    private func setLocalAndSend(_ sdp: RTCSessionDescription, type: String) {
+    private func setLocalAndSend(_ sdp: RTCSessionDescription, type: String, extra: [String: Any]) {
         peerConnection?.setLocalDescription(sdp) { [weak self] _ in
-            self?.sendSignal(type: type, payload: ["sdp": sdp.sdp])
-        }
-    }
-
-    private func receiveOffer(_ sdpString: String) {
-        let sdp = RTCSessionDescription(type: .offer, sdp: sdpString)
-        peerConnection?.setRemoteDescription(sdp) { [weak self] _ in
-            guard let self, let pc = self.peerConnection else { return }
-            let constraints = RTCMediaConstraints(mandatoryConstraints: nil, optionalConstraints: ["DtlsSrtpKeyAgreement": "true"])
-            pc.answer(for: constraints) { sdp, _ in
-                guard let sdp else { return }
-                self.setLocalAndSend(sdp, type: "call-answer")
-            }
+            var payload: [String: Any] = ["sdp": sdp.sdp]
+            for (k, v) in extra { payload[k] = v }
+            self?.sendSignal(type: type, payload: payload)
         }
     }
 
     private func receiveAnswer(_ sdpString: String) {
         let sdp = RTCSessionDescription(type: .answer, sdp: sdpString)
-        peerConnection?.setRemoteDescription(sdp) { _ in }
+        peerConnection?.setRemoteDescription(sdp) { [weak self] _ in
+            self?.drainCandidates()
+        }
+    }
+
+    private func drainCandidates() {
+        pendingCandidates.forEach { peerConnection?.add($0) }
+        pendingCandidates.removeAll()
     }
 }
 
