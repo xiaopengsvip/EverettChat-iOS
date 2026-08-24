@@ -171,9 +171,26 @@ final class WebRTCEngine: NSObject, ObservableObject {
         remoteVideoTrack = nil
         pendingCandidates.removeAll()
         pendingOfferSdp = nil
+        // 释放 WebRTC 音频会话
+        let rtcAudio = RTCAudioSession.sharedInstance()
+        rtcAudio.lockForConfiguration()
+        try? rtcAudio.setActive(false)
+        rtcAudio.unlockForConfiguration()
     }
 
     private func setupPeerConnection(video: Bool) {
+        // 配置 WebRTC 音频会话（RTCAudioSession，独立于 AVAudioSession 由 WebRTC 管理）
+        let rtcAudio = RTCAudioSession.sharedInstance()
+        rtcAudio.lockForConfiguration()
+        do {
+            try rtcAudio.setCategory(.playAndRecord, with: .duckOthers, options: [.allowBluetooth, .defaultToSpeaker])
+            try rtcAudio.setMode(.voiceChat)
+            try rtcAudio.setActive(true)
+        } catch {
+            DiagAgent.shared.log("warn", "RTCAudioSession config failed: \(error)")
+        }
+        rtcAudio.unlockForConfiguration()
+
         let config = RTCConfiguration()
         config.iceServers = iceServers
         config.sdpSemantics = .unifiedPlan
