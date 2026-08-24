@@ -26,7 +26,8 @@ struct MessagesView: View {
                     name: "AI 助手",
                     subtitle: appState.aiMessages.last?.text ?? "开始聊天吧",
                     time: appState.aiMessages.isEmpty ? "" : "现在",
-                    accent: true
+                    accent: true,
+                    avatarImage: UIImage(named: "ai_avatar")
                 ) {
                     appState.openAIChat()
                 }

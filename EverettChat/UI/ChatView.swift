@@ -976,9 +976,18 @@ struct MessageBubble: View {
         HStack(alignment: .top, spacing: 8) {
             // 左头像列（对方）
             if !isMine {
-                // AI：Evo Living Avatar（按状态动画）；对端：好友头像或占位
+                // AI：默认头像图片（思考/说话时保留动态动画）；对端：好友头像或占位
                 if isAI {
-                    LivingAvatarBubble(state: avatarState, size: 36)
+                    if let aiImg = UIImage(named: "ai_avatar") {
+                        Image(uiImage: aiImg)
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 36, height: 36)
+                            .clipShape(Circle())
+                            .overlay(Circle().stroke(Theme.outline, lineWidth: 1))
+                    } else {
+                        LivingAvatarBubble(state: avatarState, size: 36)
+                    }
                 } else {
                     if let peerAvatar = ProfileStore.shared.friendAvatar(msg.senderId.isEmpty ? msg.senderName : msg.senderId) {
                         Image(uiImage: peerAvatar)
@@ -1321,10 +1330,18 @@ struct ChatInfoSheet: View {
                 // 头部：头像 + 名称
                 Section {
                     HStack(spacing: 14) {
-                        Circle()
-                            .fill(isAI ? Theme.primaryDim : Theme.surfaceAlt)
-                            .frame(width: 52, height: 52)
-                            .overlay(Image(systemName: isAI ? "sparkles" : "person.fill").font(.system(size: 24)).foregroundColor(Theme.primary))
+                        if isAI, let img = UIImage(named: "ai_avatar") {
+                            Image(uiImage: img)
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 52, height: 52)
+                                .clipShape(Circle())
+                        } else {
+                            Circle()
+                                .fill(isAI ? Theme.primaryDim : Theme.surfaceAlt)
+                                .frame(width: 52, height: 52)
+                                .overlay(Image(systemName: isAI ? "sparkles" : "person.fill").font(.system(size: 24)).foregroundColor(Theme.primary))
+                        }
                         VStack(alignment: .leading, spacing: 2) {
                             Text(isAI ? "AI 助手" : appState.chatPeerName)
                                 .font(.headline)
